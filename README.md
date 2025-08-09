@@ -4,6 +4,8 @@
 
 to install...
 
+sudo pip3 install st7789 --break-system-packages
+
 sudo apt install python3-alsaaudio
 
 sudo apt install mplayer
