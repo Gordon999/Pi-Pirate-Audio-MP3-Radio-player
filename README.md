@@ -8,6 +8,7 @@ Features:
     * Random mode
     * Gapless mode
     * Adjust Volume
+    * Sleep
 
 TESTED with RaspiOS 32bit BOOKWORM
 
