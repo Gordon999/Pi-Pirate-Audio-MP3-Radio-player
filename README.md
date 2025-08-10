@@ -4,6 +4,8 @@
 
 TESTED with RaspiOS 32bit BOOKWORM
 
+You can use a USB hub, l added one of these https://www.waveshare.com/wiki/USB_HUB_HAT
+
 # To install...
 
 ensure SPI and I2C interfaces ON
