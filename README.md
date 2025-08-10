@@ -8,6 +8,8 @@ You can use a USB hub, l added one of these https://www.waveshare.com/wiki/USB_H
 
 On the USB sticks the format must be /Artist Name/Album Name/Track Names
 
+on the sd card under /home/USERNAME/Music/Artist Name/Album Name/Track Names
+
 You can add more radio stations in a file named Radio_Stns.txt, format for each line : Station Name,Station URL,0
 
 # To install...
