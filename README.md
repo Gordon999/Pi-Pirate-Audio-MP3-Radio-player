@@ -6,6 +6,8 @@ TESTED with RaspiOS 32bit BOOKWORM
 
 You can use a USB hub, l added one of these https://www.waveshare.com/wiki/USB_HUB_HAT
 
+On the USB sticks the format must be /Artist Name/Album Name/Track Names
+
 # To install...
 
 ensure SPI and I2C interfaces ON
