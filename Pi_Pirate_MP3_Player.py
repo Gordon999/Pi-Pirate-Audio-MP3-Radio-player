@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Copyright (c) 2023
+"""Copyright (c) 2025
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -33,7 +33,7 @@ from PIL import ImageDraw
 from PIL import ImageFont
 import ST7789
 
-version  = "1.05"
+version  = "1.06"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -58,10 +58,6 @@ Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",
               "Radio Paradise Main","http://stream.radioparadise.com/mp3-320",
               "Radio Paradise Mellow","http://stream.radioparadise.com/mellow-192",
               "Radio Caroline","http://sc6.radiocaroline.net:10558/",
-              "All Classic Network","http://wpr-ice.streamguys.net/wpr-hd2-mp3-96",
-              "News & Music Network","http://wpr-ice.streamguys.net/wpr-music-mp3-96",
-              "The Ideas Network","http://wpr-ice.streamguys.net/wpr-ideas-mp3-64",
-              "Classic FM","http://media-ice.musicradio.com:80/ClassicFMMP3",
               "BBC World Service","http://stream.live.vc.bbcmedia.co.uk/bbc_world_service"]
 
 # GPIO BUTTONS GPIO BCM numbers (Physical pin numbers)
@@ -120,7 +116,7 @@ Track_No   = config[7]
 if Track_No < 0:
     Track_No = 0
 
-# read Radio_Stns.txt - format: Station Name,Station URL
+# read Radio_Stns.txt - format: Station Name,Station URL,0
 if os.path.exists ("radio_stns.txt"): 
     with open("radio_stns.txt","r") as textobj:
         line = textobj.readline()
