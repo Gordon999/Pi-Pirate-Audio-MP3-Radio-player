@@ -4,7 +4,7 @@
 
 TESTED with RaspiOS 32bit BOOKWORM
 
-to install...
+#To install...
 
 ensure SPI and I2C interfaces ON
 
@@ -16,14 +16,16 @@ sudo apt install mplayer
 
 sudo pip3 install mutagen --break-system-packages
 
-to /boot/firmware/config.txt add...
+To /boot/firmware/config.txt add...
 
 dtoverlay=hifiberry-dac
 
 gpio=25=op,dh
 
+then
+
 copy Pi_Pirate_MP3_Player.py to home directory
 
-to run at boot if using labwc
+#To run at boot if using labwc
 
-add /usr/bin/python ~/Pi_Pirate_MP3_Player.py to ~./config/labwc/autostart
+Add /usr/bin/python ~/Pi_Pirate_MP3_Player.py to ~./config/labwc/autostart
