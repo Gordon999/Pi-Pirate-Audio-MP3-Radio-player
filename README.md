@@ -2,6 +2,13 @@
 
 ![Image](image.jpg)
 
+Features:
+    * Play MP3s or Internet Radio
+    * Album mode
+    * Random mode
+    * Gapless mode
+    * Adjust Volume
+
 TESTED with RaspiOS 32bit BOOKWORM
 
 You can use a USB hub, l added one of these https://www.waveshare.com/wiki/USB_HUB_HAT
