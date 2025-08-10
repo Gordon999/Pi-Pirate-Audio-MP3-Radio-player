@@ -16,8 +16,14 @@ sudo apt install mplayer
 
 sudo pip3 install mutagen --break-system-packages
 
+to /boot/firmware/config.txt add...
+
+dtoverlay=hifiberry-dac
+
+gpio=25=op,dh
+
 copy Pi_Pirate_MP3_Player.py to home directory
 
 to run at boot if using labwc
 
-add /usr/bin/python /home/USERNAME/Pi_Pirate_MP3_Player.py to ~./config/labwc/autostart
+add /usr/bin/python ~/Pi_Pirate_MP3_Player.py to ~./config/labwc/autostart
