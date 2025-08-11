@@ -9,6 +9,7 @@ Features:
     * Gapless mode
     * Adjust Volume
     * Sleep
+    * show album picture
 
 TESTED with RaspiOS 32bit BOOKWORM
 
