@@ -11,9 +11,7 @@ Features:
     * Sleep
     * show album picture
 
-TESTED with RaspiOS 32bit BOOKWORM
-
-You can use a USB hub, l added one of these https://www.waveshare.com/wiki/USB_HUB_HAT
+TESTED with RaspiOS 32bit BOOKWORM, and TRIXIE 64bit
 
 On the USB sticks the format must be /Artist Name/Album Name/Track Names
 
