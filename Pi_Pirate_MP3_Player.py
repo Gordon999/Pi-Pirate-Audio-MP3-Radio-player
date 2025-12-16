@@ -33,7 +33,7 @@ from PIL import ImageDraw
 from PIL import ImageFont
 import ST7789
 
-version  = "1.06"
+version  = "1.07"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -236,21 +236,28 @@ def Set_Volume():
             volume = max(volume,0)
             msg1 = "Volume " + str(volume)
             display()
-            m.setvolume(volume)
-            os.system("amixer -D pulse sset Master " + str(volume) + "%")
-            if mixername == "DSP Program":
-                os.system("amixer set 'Digital' " + str(volume + 107))
+            if len(alsaaudio.mixers()) > 0:
+                m.setvolume(volume)
+                os.system("amixer -D pulse sset Master " + str(volume) + "%")
+                if mixername == "DSP Program":
+                    os.system("amixer set 'Digital' " + str(volume + 107))
+            else:
+                os.system("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + str(volume/100))
             time.sleep(0.5)
     if time.monotonic() - timer1 < 1:
         volume += 10
         time.sleep(0.5)
-    m.setvolume(volume)
+    if len(alsaaudio.mixers()) > 0:
+        m.setvolume(volume)
     msg1 = "Volume " + str(volume)
     display()
     time.sleep(0.5)
-    os.system("amixer -D pulse sset Master " + str(volume) + "%")
-    if mixername == "DSP Program":
-        os.system("amixer set 'Digital' " + str(volume + 107))
+    if len(alsaaudio.mixers()) > 0:
+        os.system("amixer -D pulse sset Master " + str(volume) + "%")
+        if mixername == "DSP Program":
+            os.system("amixer set 'Digital' " + str(volume + 107))
+    else:
+        os.system("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + str(volume/100))
     
     defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
     with open(config_file, 'w') as f:
@@ -379,6 +386,8 @@ if len(alsaaudio.mixers()) > 0:
     os.system("amixer -D pulse sset Master " + str(volume) + "%")
     if mixername == "DSP Program":
         os.system("amixer set 'Digital' " + str(volume + 107))
+else:
+    os.system("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + str(volume/100))
         
 
 # disable Radio Play if MP3 Play set
