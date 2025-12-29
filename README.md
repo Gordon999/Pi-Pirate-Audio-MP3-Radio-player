@@ -13,7 +13,7 @@ Features:
 
 TESTED with RaspiOS 32bit BOOKWORM, and TRIXIE 64bit
 
-On the USB sticks the format must be /Artist Name/Album Name/Track Names
+On the USB sticks the format must be/media/USERNAME/USBNAME/Artist Name/Album Name/Track Names
 
 on the sd card under /home/USERNAME/Music/Artist Name/Album Name/Track Names
 
