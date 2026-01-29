@@ -21,6 +21,9 @@ You can add more radio stations in a file named Radio_Stns.txt, format for each 
 
 # To install...
 
+(NOTE: I am suggesting the use of --break-system-packages, this shouldn't be an issue if using this in a standalone
+pi BUT if not then learn how to use venv !!)
+
 ensure SPI and I2C interfaces ON
 
 sudo pip3 install st7789 --break-system-packages
