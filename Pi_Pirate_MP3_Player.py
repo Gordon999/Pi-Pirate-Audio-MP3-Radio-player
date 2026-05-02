@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Copyright (c) 2025
+"""Copyright (c) 2026
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -33,7 +33,7 @@ from PIL import ImageDraw
 from PIL import ImageFont
 import ST7789
 
-version  = "1.07"
+version  = "1.09"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -162,6 +162,7 @@ msg7        = ""
 msg8        = ""
 abort_sd    = 1
 usb_found   = 0
+relno       = 0
 
 # find username
 h_user  = []
@@ -185,11 +186,12 @@ time.sleep(1)
 stop = 0
 
 def reload():
-  global tracks,x,top,msg1,msg2,Track_No,stop
+  global tracks,x,top,msg1,msg2,msg3,Track_No,stop,relno
   if stop == 0:
     tracks  = []
     msg1 = "Tracks: " + str(len(tracks))
     msg2 = "Reloading tracks... "
+    msg3 = "R: " + str(relno)
     display()
     usb_tracks  = glob.glob("/media/" + h_user[0] + "/*/*/*/*.mp3")
     sd_tracks = glob.glob("/home/" + h_user[0] + "/Music/*/*/*.mp3")
@@ -299,7 +301,7 @@ with open("freedisk.txt", "r") as file:
 # check if SD Card ~/Music has changed
 if not os.path.exists('freeSD.txt'):
     with open("freeSD.txt", "w") as f:
-            f.write("0")
+        f.write("0")
 with open("freeSD.txt", "r") as file:
     line = file.readline()
 
@@ -313,10 +315,14 @@ def get_dir_size(dir_path):
     return total_size
 
 total_size = get_dir_size("/home/" +  h_user[0] + "/Music")
+
 if line != str(total_size):
+    msg4 = str(line) + " " + str(total_size)
+    display()
     with open("freeSD.txt", "w") as f:
         f.write(str(total_size))
     reloading = 1
+    relno     = 1
 
 # load MP3 tracks
 tracks  = []
@@ -358,6 +364,7 @@ if use_USB == 1:
                     for item in free:
                         f.write("%s\n" % item)
                 reloading = 1
+                relno +=2
     else:
         freedisk = ["0","0","0","0"]
         with open("freedisk.txt", "w") as f:
@@ -374,9 +381,18 @@ if use_USB == 1:
 
 if reloading == 1 and stop == 0:
     reload()
+  
+#check linux version.
+lv = os.popen("cat /etc/os-release").read()
+lva = lv.split("\n")
+for w in range(0,len(lva)):
+    if lva[w][0:16] == "VERSION_CODENAME":
+        lvers = lva[w].split("=")
+        lver = lvers[1][0:6]
+print(lver)
 
 # check for audio mixers
-if len(alsaaudio.mixers()) > 0:
+if len(alsaaudio.mixers()) > 0 and lver == "bookwo":
     for mixername in alsaaudio.mixers():
         if str(mixername) == "PCM" or str(mixername) == "DSP Program" or str(mixername) == "Master" or str(mixername) == "Capture" or str(mixername) == "Headphone" or str(mixername) == "HDMI":
             m = alsaaudio.Mixer(mixername)
@@ -459,6 +475,7 @@ xt                = 0
 
 # check if clock synchronised
 msg1 = "Checking clock..."
+msg2 = " "
 display()
 if os.path.exists ("/run/shm/sync.txt"):
     os.remove("/run/shm/sync.txt")
@@ -475,8 +492,12 @@ try:
         synced = 1
     else:
         synced = 0
+    msg2 = str(synced)
+    display()
 except:
     pass
+    msg2 = "Clock Error"
+    display()
 
 while True:
     # loop while stopped
@@ -499,6 +520,8 @@ while True:
                     synced = 1
                 else:
                     synced = 0
+                #msg2 = str(synced)
+                #display()
             except:
                 pass
             
