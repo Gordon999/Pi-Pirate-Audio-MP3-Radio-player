@@ -44,4 +44,4 @@ gpio=25=op,dh
 
 # To run at boot if using labwc
 
-Add /usr/bin/python ~/Pi_Pirate_MP3_Player.py to ~./config/labwc/autostart
+Add /usr/bin/python ~/Pi_Pirate_MP3_Player.py to ~/.config/labwc/autostart
