@@ -31,9 +31,8 @@ from signal import signal, SIGTERM, SIGHUP, pause
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
-import ST7789
 
-version  = "1.10"
+version  = "1.12"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -53,12 +52,13 @@ sleep_shutdn = 0   # set to 1 to shutdown Pi when sleep times out
 Disp_timer   = 60  # Display timeout in seconds, set to 0 to disable
 show_clock   = 1   # set to 1 to show clock, only use if on web or using RTC
 gaptime      = 2   # set pre-start time for gapless, in seconds
+screen       = 0   # for testing, 0 = ST7789, 1 = pygame screen
 
-Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",
-              "Radio Paradise Main","http://stream.radioparadise.com/mp3-320",
-              "Radio Paradise Mellow","http://stream.radioparadise.com/mellow-192",
-              "Radio Caroline","http://sc6.radiocaroline.net:10558/",
-              "BBC World Service","http://stream.live.vc.bbcmedia.co.uk/bbc_world_service"]
+Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",0,
+              "Radio Paradise Main","http://stream.radioparadise.com/mp3-320",0,
+              "Radio Paradise Mellow","http://stream.radioparadise.com/mellow-192",0,
+              "Radio Caroline","http://sc6.radiocaroline.net:10558/",0,
+              "BBC World Service","http://stream.live.vc.bbcmedia.co.uk/bbc_world_service",0]
 
 # GPIO BUTTONS GPIO BCM numbers (Physical pin numbers)
 PLAY  = 5  # (29) PLAY / STOP / HOLD for 3 seconds for RADIO 
@@ -66,16 +66,26 @@ SLEEP = 24 # (18) Set SLEEP time, HOLD for 20 seconds to SHUTDOWN, set GAPLESS/S
 VOLUP = 6  # (31) Adjust volume UP whilst playing, set ALBUM MODE/RANDOM ON/OFF whilst stopped
 NEXT  = 16 # (36) HOLD for NEXT TRACK / STATION (whilst playing) / NEXT ALBUM (whilst stopped) - quick press for PREVIOUS 
 
-#display_type = "square"
-disp = ST7789.ST7789(height=240,rotation=90,port=0,cs=1,dc=9,backlight=13,spi_speed_hz=80 * 1000 * 1000,offset_left=0,offset_top=0,)
+if screen == 0:
+    import st7789
+    #display_type = "square"
+    disp = st7789.ST7789(height=240,rotation=90,port=0,cs=1,dc=9,backlight=13,spi_speed_hz=80 * 1000 * 1000,offset_left=0,offset_top=0,)
 
-# Initialize display.
-disp.begin()
-WIDTH  = disp.width
-HEIGHT = disp.height
-img    = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
-draw   = ImageDraw.Draw(img)
-font   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+    #Initialize display.
+    disp.begin()
+    WIDTH  = disp.width
+    HEIGHT = disp.height
+    img    = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
+    draw   = ImageDraw.Draw(img)
+    font   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+    
+elif screen == 1:
+    font_size = 25
+    import pygame
+    from pygame.locals import *
+    pygame.init()
+    windowSurfaceObj = pygame.display.set_mode((font_size * 15,font_size * 8),1, 24)
+    pygame.display.set_caption("MP3 / Radio Player" )
 
 # check config file exists, if not then write default values
 config_file = "OLEDconfig.txt"
@@ -168,18 +178,31 @@ h_user  = []
 h_user.append(os.getlogin())
 
 def display_screen():
-    global image,top,msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,font,img,MP3_Play,radio
+    global image,top,msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,font,img,MP3_Play,radio,screen,font_size
     # Display image.
-    draw.rectangle((0, 0, 240, 240), (0, 0, 0))
-    draw.text((0, 0), msg1, font=font, fill=(0, 255, 0))
-    draw.text((0,30), msg2, font=font, fill=(255, 2, 255))
-    draw.text((0,60), msg3, font=font, fill=(255, 2, 255))
-    draw.text((0,90), msg4, font=font, fill=(255, 2, 255))
-    draw.text((0,120),msg5, font=font, fill=(255, 255, 255))
-    draw.text((0,150),msg6, font=font, fill=(255, 255, 255))
-    draw.text((0,180),msg7, font=font, fill=(255, 255, 255))
-    draw.text((0,210),msg8, font=font, fill=(0, 255, 0))
-    disp.display(img)
+    if screen == 0:
+        draw.rectangle((0, 0, 240, 240), (0, 0, 0))
+        draw.text((0, 0), msg1, font=font, fill=(  0, 255,   0))
+        draw.text((0,30), msg2, font=font, fill=(255,   2, 255))
+        draw.text((0,60), msg3, font=font, fill=(255,   2, 255))
+        draw.text((0,90), msg4, font=font, fill=(255,   2, 255))
+        draw.text((0,120),msg5, font=font, fill=(255, 255, 255))
+        draw.text((0,150),msg6, font=font, fill=(255, 255, 255))
+        draw.text((0,180),msg7, font=font, fill=(255, 255, 255))
+        draw.text((0,210),msg8, font=font, fill=(  0, 255,   0))
+        disp.display(img)
+    elif screen == 1:
+        fontObj = pygame.font.Font(None,font_size)
+        data = [msg1,msg2,msg3,msg4,msg5,msg7,msg7,msg8]
+        clrs = [(200,200,0),(200,0,0),(0,0,200),(0,200,0),(100,100,100),(100,100,100),(100,100,100),(100,100,100)]
+        for x in range(0,8):
+            pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(10,x * font_size,640,font_size))
+            msgSurfaceObj = fontObj.render(data[x], False, clrs[x])
+            msgRectobj = msgSurfaceObj.get_rect()
+            msgRectobj.topleft = (10,x * font_size)
+            windowSurfaceObj.blit(msgSurfaceObj, msgRectobj)
+        pygame.display.update()
+		
 display_screen()
 time.sleep(1)
 
@@ -191,9 +214,9 @@ def reload():
     msg2 = "Reloading tracks... "
     msg3 = "R: " + str(relno)
     display_screen()
-    usb_tracks  = glob.glob("/media/" + h_user[0] + "/*/*/*/*.mp3")
-    sd_tracks = glob.glob("/home/" + h_user[0] + "/Music/*/*/*.mp3")
-    titles = [0,0,0,0,0,0,0]
+    usb_tracks = glob.glob("/media/" + h_user[0] + "/*/*/*/*.mp3")
+    sd_tracks  = glob.glob("/home/" + h_user[0] + "/Music/*/*/*.mp3")
+    titles     = [0,0,0,0,0,0,0]
     if len(sd_tracks) > 0:
       for xx in range(0,len(sd_tracks)):
         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = sd_tracks[xx].split("/")
@@ -224,7 +247,7 @@ def reload():
     time.sleep(1)
 
 def Set_Volume():
-    global mixername,m,msg1,msg2,msg3,msg4,MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,buttonVOLUP
+    global mixername,m,msg1,msg2,msg3,msg4,MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,buttonVOLUP,lver
     msg1 = "Volume " + str(volume)
     display_screen()
     timer1 = time.monotonic()
@@ -236,7 +259,7 @@ def Set_Volume():
             volume = max(volume,0)
             msg1 = "Volume " + str(volume)
             display_screen()
-            if len(alsaaudio.mixers()) > 0:
+            if len(alsaaudio.mixers()) > 0 and lver < 13:
                 m.setvolume(volume)
                 os.system("amixer -D pulse sset Master " + str(volume) + "%")
                 if mixername == "DSP Program":
@@ -247,12 +270,12 @@ def Set_Volume():
     if time.monotonic() - timer1 < 1:
         volume += 10
         time.sleep(0.5)
-    if len(alsaaudio.mixers()) > 0:
+    if len(alsaaudio.mixers()) > 0 and lver < 13:
         m.setvolume(volume)
     msg1 = "Volume " + str(volume)
     display_screen()
     time.sleep(0.5)
-    if len(alsaaudio.mixers()) > 0:
+    if len(alsaaudio.mixers()) > 0 and lver < 13:
         os.system("amixer -D pulse sset Master " + str(volume) + "%")
         if mixername == "DSP Program":
             os.system("amixer set 'Digital' " + str(volume + 107))
@@ -528,8 +551,6 @@ while True:
                     synced = 1
                 else:
                     synced = 0
-                #msg2 = str(synced)
-                #display_screen()
             except:
                 pass
             
@@ -1248,16 +1269,16 @@ while True:
             timer1 = time.monotonic()
             while buttonNEXT.is_pressed:
               if time.monotonic() - timer1 > 1:
-                radio_stn +=2
-                if radio_stn > len(Radio_Stns)- 2:
+                radio_stn +=3
+                if radio_stn > len(Radio_Stns)- 3:
                    radio_stn = 0
                 msg1 = (Radio_Stns[radio_stn])
                 display_screen()
                 time.sleep(1)
               else:
-                radio_stn -=2
+                radio_stn -=3
                 if radio_stn < 0:
-                    radio_stn = len(Radio_Stns) - 2
+                    radio_stn = len(Radio_Stns) - 3
                 msg2 = (Radio_Stns[radio_stn])
                 display_screen()
                 time.sleep(1)
@@ -1290,6 +1311,7 @@ while True:
                 msg1 = "<PLAY/Radio   NEXT>"
             else:
                 msg1 = "Radio Stopped      "
+            msg3 = ""
             display_screen()
             defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
             with open(config_file, 'w') as f:
