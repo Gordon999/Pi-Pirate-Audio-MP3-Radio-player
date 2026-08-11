@@ -17,6 +17,11 @@ On the USB sticks the format must be/media/USERNAME/USBNAME/Artist Name/Album Na
 
 on the sd card under /home/USERNAME/Music/Artist Name/Album Name/Track Names
 
+Put Album Cover images in Album Name directory, use .jpgs and ideally 240 x 240.
+
+Put Radio Station logo images in /home/USERNAME/, use .jpgs and ideally 240 x 240. Name must be same as Radio Stn + .jpg.
+eg Radio Paradise Rock.jpg.
+
 You can add more radio stations in a file named Radio_Stns.txt, format for each line : Station Name,Station URL,0
 
 # To install...
