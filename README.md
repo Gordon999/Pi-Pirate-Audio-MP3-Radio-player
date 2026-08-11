@@ -24,6 +24,9 @@ eg Radio Paradise Rock.jpg.
 
 You can add more radio stations in a file named Radio_Stns.txt, format for each line : Station Name,Station URL,0
 
+Press and release for first option, press and hold for second eg. VOL +/-, press and release will increase volume, 
+press and hold will decrease volume.
+
 # To install...
 
 (NOTE: I am suggesting the use of --break-system-packages, this shouldn't be an issue if using this in a standalone
