@@ -32,12 +32,12 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.12"
+version  = "1.14"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
 radio        = 0   # set to 1 to start playing Radio at boot, else 0
-radio_stn    = 0   # selected radio station at startup 
+radio_stn    = 0   # selected radio station at startup (Note 0,3,6 etc)
 shuffled     = 0   # 0 = Unshuffled, 1 = Shuffled
 album_mode   = 0   # set to 1 for Album Mode, will play an album then stop
 gapless      = 0   # set to 1 for gapless play
@@ -62,46 +62,46 @@ Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",0
 
 # GPIO BUTTONS GPIO BCM numbers (Physical pin numbers)
 PLAY  = 5  # (29) PLAY / STOP / HOLD for 3 seconds for RADIO 
-SLEEP = 24 # (18) Set SLEEP time, HOLD for 20 seconds to SHUTDOWN, set GAPLESS/SHUTDOWN whilst stopped.
 VOLUP = 6  # (31) Adjust volume UP whilst playing, set ALBUM MODE/RANDOM ON/OFF whilst stopped
 NEXT  = 16 # (36) HOLD for NEXT TRACK / STATION (whilst playing) / NEXT ALBUM (whilst stopped) - quick press for PREVIOUS 
+SLEEP = 24 # (18) Set SLEEP time, HOLD for 20 seconds to SHUTDOWN, set GAPLESS/SHUTDOWN whilst stopped.
 
-if screen == 0:
+if screen == 0: # st7789 screen
     import st7789
-    #display_type = "square"
     disp = st7789.ST7789(height=240,rotation=90,port=0,cs=1,dc=9,backlight=13,spi_speed_hz=80 * 1000 * 1000,offset_left=0,offset_top=0,)
-
-    #Initialize display.
     disp.begin()
     WIDTH  = disp.width
     HEIGHT = disp.height
     img    = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
-    draw   = ImageDraw.Draw(img)
     font   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+    disp.set_backlight(1)
     
-elif screen == 1:
-    font_size = 25
+elif screen == 1: # for testing with pygame, and pirate buttons
     import pygame
     from pygame.locals import *
     pygame.init()
-    windowSurfaceObj = pygame.display.set_mode((font_size * 15,font_size * 8),1, 24)
+    font_size = 30
+    windowSurfaceObj = pygame.display.set_mode((240,240),1, 24)
     pygame.display.set_caption("MP3 / Radio Player" )
 
 # check config file exists, if not then write default values
-config_file = "OLEDconfig.txt"
+config_file = "PirateConfig.txt"
 if not os.path.exists(config_file):
+    headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
     defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
     with open(config_file, 'w') as f:
-        for item in defaults:
-            f.write("%s\n" % item)
+        for item in range(0,len(headers)):
+            f.write(headers[item] + " : " + str(defaults[item]) + "\n")
 
 # read config file
 config = []
 with open(config_file, "r") as file:
    line = file.readline()
    while line:
-      config.append(line.strip())
-      line = file.readline()
+       line = line.strip()
+       item = line.split(" : ")
+       config.append(item[1])
+       line = file.readline()
 config = list(map(int,config))
 
 MP3_Play   = config[0]
@@ -115,7 +115,7 @@ Track_No   = config[7]
 
 if Track_No < 0:
     Track_No = 0
-
+    
 # read radio_stns.txt (Station Name,URL,X)
 if os.path.exists ("radio_stns.txt"): 
     with open("radio_stns.txt","r") as textobj:
@@ -134,6 +134,9 @@ if os.path.exists ("radio_stns.txt"):
                     Radio_Stns.append(b.strip())
                     Radio_Stns.append(0)
             line = textobj.readline()
+            
+if radio_stn > len(Radio_Stns) - 3:
+    radio_stn = 0
 
 # setup GPIO for buttons
 buttonPLAY  = Button(PLAY)
@@ -172,32 +175,56 @@ abort_sd    = 1
 usb_found   = 0
 relno       = 0
 stop        = 0
+pfiles      = []
+showit      = 1
 
 # find username
 h_user  = []
 h_user.append(os.getlogin())
 
 def display_screen():
-    global image,top,msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,font,img,MP3_Play,radio,screen,font_size
+    global image,top,msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,font,img,WIDTH,HEIGHT
+    global MP3_Play,radio,screen,font_size,radio,Radio_Stns,radio_stn,pfiles,Disp_on
     # Display image.
-    if screen == 0:
-        draw.rectangle((0, 0, 240, 240), (0, 0, 0))
-        draw.text((0, 0), msg1, font=font, fill=(  0, 255,   0))
-        draw.text((0,30), msg2, font=font, fill=(255,   2, 255))
-        draw.text((0,60), msg3, font=font, fill=(255,   2, 255))
-        draw.text((0,90), msg4, font=font, fill=(255,   2, 255))
-        draw.text((0,120),msg5, font=font, fill=(255, 255, 255))
-        draw.text((0,150),msg6, font=font, fill=(255, 255, 255))
-        draw.text((0,180),msg7, font=font, fill=(255, 255, 255))
-        draw.text((0,210),msg8, font=font, fill=(  0, 255,   0))
+    if screen == 0: # st7789 screen
+        if Disp_on == 1:
+            disp.set_backlight(1)
+        data = [msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8]
+        clrs = [(255,255,0),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,0)]
+        if radio == 1 and os.path.exists(Radio_Stns[radio_stn] + ".jpg") and Disp_on == 1:
+            with Image.open(Radio_Stns[radio_stn] + ".jpg") as img:
+                img  = img.resize((240,240),resample=Image.LANCZOS)
+                draw = ImageDraw.Draw(img)
+                for x in range(0,8):
+                    draw.text((0, x * 30), data[x], font=font, fill=clrs[x])
+        elif radio == 0 and len(pfiles) > 0 and os.path.exists(pfiles[0]) and Disp_on == 1:
+            with Image.open(pfiles[0]) as img:
+                img  = img.resize((240,240),resample=Image.LANCZOS)
+                draw = ImageDraw.Draw(img)
+                for x in range(0,8):
+                    draw.text((0, x * 30), data[x], font=font, fill=clrs[x])
+        else:
+            img  = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.rectangle((0, 0, 240, 240), (0, 0, 0))
+            for x in range(0,8):
+                draw.text((0, x * 30), data[x], font=font, fill=clrs[x])
         disp.display(img)
-    elif screen == 1:
+    elif screen == 1: # pygame screen
         fontObj = pygame.font.Font(None,font_size)
-        data = [msg1,msg2,msg3,msg4,msg5,msg7,msg7,msg8]
-        clrs = [(200,200,0),(200,0,0),(0,0,200),(0,200,0),(100,100,100),(100,100,100),(100,100,100),(100,100,100)]
+        data = [msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8]
+        clrs = [(255,0,0),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,0)]
+        pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(0,0,240,240))
+        if radio == 1 and os.path.exists(Radio_Stns[radio_stn] + ".jpg") and Disp_on == 1:
+            image = pygame.image.load(Radio_Stns[radio_stn] + ".jpg")
+            image = pygame.transform.scale(image,(240,240))
+            windowSurfaceObj.blit(image,(0,0))
+        elif radio == 0 and len(pfiles) > 0 and os.path.exists(pfiles[0]) and Disp_on == 1:
+            image = pygame.image.load(pfiles[0])
+            image = pygame.transform.scale(image,(240,240))
+            windowSurfaceObj.blit(image,(0,0))
         for x in range(0,8):
-            pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(10,x * font_size,640,font_size))
-            msgSurfaceObj = fontObj.render(data[x], False, clrs[x])
+            msgSurfaceObj = fontObj.render(data[x], False,clrs[x])
             msgRectobj = msgSurfaceObj.get_rect()
             msgRectobj.topleft = (10,x * font_size)
             windowSurfaceObj.blit(msgSurfaceObj, msgRectobj)
@@ -212,7 +239,7 @@ def reload():
     tracks  = []
     msg1 = "Tracks: " + str(len(tracks))
     msg2 = "Reloading tracks... "
-    msg3 = "R: " + str(relno)
+    msg3 = "" 
     display_screen()
     usb_tracks = glob.glob("/media/" + h_user[0] + "/*/*/*/*.mp3")
     sd_tracks  = glob.glob("/home/" + h_user[0] + "/Music/*/*/*.mp3")
@@ -234,16 +261,17 @@ def reload():
             f.write("%s\n" % item)
     msg1 = ("Tracks: " + str(len(tracks)))
     Track_No = 0
+    headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
     defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
     with open(config_file, 'w') as f:
-        for item in defaults:
-            f.write("%s\n" % item)
+        for item in range(0,len(headers)):
+            f.write(headers[item] + " : " + str(defaults[item]) + "\n")
     display_screen()
     if len(tracks) == 0:
         msg1 = "Tracks: " + str(len(tracks))
         msg2 = "Stopped Checking"
-        display_screen()
         stop = 1
+    display_screen()
     time.sleep(1)
 
 def Set_Volume():
@@ -282,10 +310,11 @@ def Set_Volume():
     else:
         os.system("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + str(volume/100))
     
+    headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
     defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
     with open(config_file, 'w') as f:
-        for item in defaults:
-            f.write("%s\n" % item)
+        for item in range(0,len(headers)):
+            f.write(headers[item] + " : " + str(defaults[item]) + "\n")
 
 def status():
     global txt,shuffled,gapless,album_mode,sleep_timer
@@ -356,6 +385,9 @@ else:
              tracks.append(line.strip())
              line = file.readline()
 msg1 = "Tracks: " + str(len(tracks))
+
+if Track_No > len(tracks) - 1:
+    Track_No = 0
 display_screen()
 
 # check if USB mounted and find USB storage
@@ -495,27 +527,23 @@ xt                = 0
 
 # check if clock synchronised
 msg1 = "Checking clock..."
-msg2 = "1"
+msg2 = ""
 msg3 = ""
 display_screen()
 if os.path.exists ("/run/shm/sync.txt"):
     os.remove("/run/shm/sync.txt")
-msg2 = "2"
 display_screen()
 os.system("timedatectl >> /run/shm/sync.txt")
-msg2 = "3"
 display_screen()
 # read sync.txt file
 try:
     sync = []
-    msg2 = "4"
     display_screen()
     with open("/run/shm/sync.txt", "r") as file:
         line = file.readline()
         while line:
             sync.append(line.strip())
             line = file.readline()
-    msg2 = "5"
     display_screen()
     if sync[4] == "System clock synchronized: yes":
         synced = 1
@@ -555,20 +583,19 @@ while True:
                 pass
             
         # display Artist / Album / Track names
-        if Disp_on == 1:
-          msg1 = "<PLAY/Radio   NEXT>"
+        if Disp_on == 1 and showit == 1:
+          showit = 0
+          msg1 = "PLAY/Radio  PRE/NXT"
           if len(tracks) > 0:
-            msg2 = titles[0][0:19]
-            msg3 = titles[1][0:19]
-            msg4 = titles[2][0:19]
-            try:
-                if int(titles[2][0:2]) > 0:
-                    msg4 = titles[2][3:22]
-            except:
-                pass
+            msg2 = titles[0][0:19] # Artist
+            msg3 = titles[1][0:19] # Album
+            msg4 = titles[2][0:19] # Track
+            # find album cover image
+            ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+            pfiles = glob.glob(ptrack + "*.jpg")
             status()
           msg6 = "Status...  "  +  txt
-          msg8 = "<ALB/RNDM     GAP>"
+          msg8 = "ALB/RNDM    GAP/SD"
           if sleep_timer != 0:
               time_left = int((sleep_timer - (time.monotonic() - sleep_timer_start))/60)
               if sleep_shutdn == 1:
@@ -577,7 +604,7 @@ while True:
                   msg7 = "Stopping: " + str(time_left) + "mins"
           display_screen()
 
-        # display clock (if enabled and synced)
+        # display clock (if enabled and synced) when timed out
         if show_clock == 1 and Disp_on == 0 and synced == 1 and stopped == 0 and abort_sd == 1:
             now = datetime.datetime.now()
             clock = now.strftime("%H:%M:%S")
@@ -626,6 +653,9 @@ while True:
             msg7 = ""
             msg8 = ""
             Disp_on = 0
+            showit = 0
+            if show_clock == 0 and screen == 0:
+                disp.set_backlight(0)
             display_screen()
             
         # sleep_timer timer
@@ -666,7 +696,7 @@ while True:
                     os.system("sudo shutdown -h now")
             else:
                 status()
-                msg1 = "<PLAY/Radio   NEXT>"
+                msg1 = "PLAY/Radio  PRE/NXT"
                 display_screen()
             Disp_start = time.monotonic()
             
@@ -675,7 +705,7 @@ while True:
             Disp_on = 1
             Disp_start = time.monotonic()
             status()
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
             time.sleep(0.5)
             timer2 = time.monotonic()
         elif buttonPLAY.is_pressed:
@@ -683,7 +713,7 @@ while True:
             Disp_on = 1
             Disp_start = time.monotonic()
             timer1 = time.monotonic()
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
             msg2 = "HOLD 3s for RADIO"
             msg3 = ""
             msg4 = ""
@@ -708,11 +738,6 @@ while True:
                     tartist = stitles[0]
                     ptrack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/"
                     pfiles = glob.glob(ptrack + "*.jpg")
-                    if len(pfiles) > 0:
-                        image=Image.open(pfiles[0])  
-                        image=image.resize((240,240),resample=Image.LANCZOS)
-                        disp.display(image)
-                        time.sleep(1)
                         
                     while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
                         stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
@@ -723,16 +748,15 @@ while True:
                     audio = MP3(strack)
                     stimer -= audio.info.length
                     ctracks = Tack_No - Track_No - 1
-                    
                 atimer = time.monotonic()
                 MP3_Play = 1
                 radio    = 0
-                              
                 time.sleep(2)
+                headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
                 defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
                 with open(config_file, 'w') as f:
-                    for item in defaults:
-                        f.write("%s\n" % item)
+                    for item in range(0,len(headers)):
+                        f.write(headers[item] + " : " + str(defaults[item]) + "\n")
             else:
                 msg2 = ""
                 msg3 = ""
@@ -744,32 +768,31 @@ while True:
                 rs = Radio_Stns[radio_stn]
                 while buttonPLAY.is_pressed:
                     pass
-                if os.path.exists (rs + ".jpg"):
-                    image=Image.open(rs + ".jpg")  
-                    image=image.resize((240,240),resample=Image.LANCZOS)
-                    disp.display(image)
-                    time.sleep(1)
                 radio    = 1
                 MP3_Play = 0
+                headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
                 defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
                 with open(config_file, 'w') as f:
-                    for item in defaults:
-                        f.write("%s\n" % item)
+                    for item in range(0,len(headers)):
+                        f.write(headers[item] + " : " + str(defaults[item]) + "\n")
                 
         # check NEXT/PREVIOUS ALBUM/ARTIST/A-Z key
         if buttonNEXT.is_pressed and Disp_on == 0:
             Disp_on = 1
+            showit  = 1
             Disp_start = time.monotonic()
             status()
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
             time.sleep(0.5)
             timer2 = time.monotonic()
         elif buttonNEXT.is_pressed and len(tracks) > 1:
             Disp_on = 1
+            showit  = 1
             time.sleep(0.2)
             timer1 = time.monotonic()
             while buttonNEXT.is_pressed and time.monotonic() - timer1 < 1:
                 pass
+            # NEXT TRACK
             if time.monotonic() - timer1 < 1:
                     while titles[1] == old_album and titles[0] == old_artist and Track_No > -1:
                         Track_No -=1
@@ -795,16 +818,14 @@ while True:
                         strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
                         Tack_No +=1
                     ctracks = Tack_No - Track_No - 1
-                    msg1 = "<PLAY/Radio   NEXT>" 
+                    pfiles = []
+                    ptrack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/"
+                    pfiles = glob.glob(ptrack + "*.jpg")
+                    msg1 = "PLAY/Radio  PRE/NXT" 
                     time.sleep(0.05)
                     msg2 = titles[0][0:19]
                     msg3 = titles[1][0:19]
                     msg4 = titles[2][0:19]
-                    try:
-                        if int(titles[2][0:2]) > 0:
-                            msg4 = titles[2][3:22]
-                    except:
-                        pass
                     display_screen()
                     time.sleep(0.05)
                     timer3 = time.monotonic()
@@ -812,6 +833,7 @@ while True:
                     time.sleep(0.5)
             if time.monotonic() - timer1 > 1:
                 # NEXT ALBUM
+                showit = 1
                 while buttonNEXT.is_pressed and buttonSLEEP.is_pressed == 0 and buttonVOLUP.is_pressed == 0:
                     while titles[1] == old_album and titles[0] == old_artist and Track_No < len(tracks) - 1:
                         Track_No +=1
@@ -828,15 +850,13 @@ while True:
                         strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
                         Tack_No +=1
                     ctracks = Tack_No - Track_No - 1
-                    msg1 = "<PLAY/Radio   NEXT>" 
+                    msg1 = "PLAY/Radio  PRE/NXT" 
                     msg2 = titles[0][0:19]
                     msg3 = titles[1][0:19]
                     msg4 = titles[2][0:19]
-                    try:
-                        if int(titles[2][0:2]) > 0:
-                            msg4 = titles[2][3:22]
-                    except:
-                        pass
+                    pfiles = []
+                    ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+                    pfiles = glob.glob(ptrack + "*.jpg")
                     display_screen()
                     time.sleep(0.5)
                 # NEXT ARTIST
@@ -857,11 +877,9 @@ while True:
                     msg2 = titles[0][0:19]
                     msg3 = titles[1][0:19]
                     msg4 = titles[2][0:19]
-                    try:
-                        if int(titles[2][0:2]) > 0:
-                            msg4 = titles[2][3:22]
-                    except:
-                        pass
+                    pfiles = []
+                    ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+                    pfiles = glob.glob(ptrack + "*.jpg")
                     display_screen()
                     time.sleep(0.5)
                 # NEXT A-Z ARTIST    
@@ -882,11 +900,9 @@ while True:
                     msg2 = titles[0][0:19]
                     msg3 = titles[1][0:19]
                     msg4 = titles[2][0:19]
-                    try:
-                        if int(titles[2][0:2]) > 0:
-                            msg4 = titles[2][3:22]
-                    except:
-                        pass
+                    pfiles = []
+                    ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+                    pfiles = glob.glob(ptrack + "*.jpg")
                     display_screen()
                     time.sleep(0.5)
             timer3 = time.monotonic()
@@ -895,13 +911,15 @@ while True:
         # check for GAPLESS/SHUTDOWN (SLEEP)  key
         if buttonSLEEP.is_pressed and Disp_on == 0:
             Disp_on = 1
+            showit  = 1
             Disp_start = time.monotonic()
             status()
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
             time.sleep(0.5)
             timer2 = time.monotonic()
         elif buttonSLEEP.is_pressed:
             time.sleep(0.5)
+            showit = 1
             timer1 = time.monotonic()
             timer = time.monotonic()
             if gapless == 0:
@@ -933,12 +951,13 @@ while True:
                     track_n = str(Track_No + 1) + "     "
             else:
                     track_n = "1/" + str(ctracks) + "       "
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
             display_screen()
+            headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
             defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
             with open(config_file, 'w') as f:
-                    for item in defaults:
-                        f.write("%s\n" % item)
+                for item in range(0,len(headers)):
+                    f.write(headers[item] + " : " + str(defaults[item]) + "\n")
             time.sleep(0.5)
             timer2 = time.monotonic()
             xt = 2
@@ -972,12 +991,14 @@ while True:
         # check for ALBUM MODE/RANDOM (VOLUP) key
         if  buttonVOLUP.is_pressed and Disp_on == 0:
             Disp_on = 1
+            showit  = 1
             Disp_start = time.monotonic()
             status()
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
             time.sleep(0.5)
             timer2 = time.monotonic()
         elif buttonVOLUP.is_pressed:
+            showit = 1
             timer1 = time.monotonic()
             while buttonVOLUP.is_pressed and time.monotonic() - timer1 < 2:
                 pass
@@ -1028,10 +1049,13 @@ while True:
                     msg7 = ""
                     msg8 = ""
                     track_n  = str(Track_No) + "     "
+                headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
                 defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
                 with open(config_file, 'w') as f:
-                    for item in defaults:
-                        f.write("%s\n" % item)
+                    for item in range(0,len(headers)):
+                        f.write(headers[item] + " : " + str(defaults[item]) + "\n")
+                ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+                pfiles = glob.glob(ptrack + "*.jpg")
                 display_screen()
                 time.sleep(1)
 
@@ -1075,10 +1099,11 @@ while True:
                         album_mode = 1
                         track_n = "1/" + str(ctracks) + "       "
                 display_screen()
+                headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
                 defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
                 with open(config_file, 'w') as f:
-                    for item in defaults:
-                        f.write("%s\n" % item)
+                    for item in range(0,len(headers)):
+                        f.write(headers[item] + " : " + str(defaults[item]) + "\n")
                 time.sleep(1)
                 timer2 = time.monotonic()
                 xt = 2
@@ -1087,7 +1112,9 @@ while True:
                 track_n = str(Track_No + 1) + "     "
             else:
                 track_n = "1/" + str(ctracks) + "       "
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
+            ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+            pfiles = glob.glob(ptrack + "*.jpg")
             display_screen()
             timer2 = time.monotonic()
             xt = 2
@@ -1125,6 +1152,8 @@ while True:
             msg7 = ""
             msg8 = ""
             Disp_on = 0
+            if show_clock == 0 and screen == 0:
+                disp.set_backlight(0)
             display_screen()
             
         # sleep_timer timer
@@ -1192,8 +1221,8 @@ while True:
             t += " "
         clock = t + clock
         if Disp_on == 1:
-            msg1 = "<STOP             NEXT>"
-            msg8 = "<VOLUME       SLEEP>"
+            msg1 = "STOP         PRE/NEXT"
+            msg8 = "VOL+/-       SLEEP/SD"
             display_screen()
         if show_clock == 1 and Disp_on == 0 and synced == 1 and stopped == 0:
             if secs != old_secs:
@@ -1232,24 +1261,29 @@ while True:
             Disp_on = 1
             Disp_start = time.monotonic()
             status()
-            if album_mode == 0:
-                track_n = str(Track_No + 1) + "     "
-            else:
-                track_n = "1/" + str(ctracks) + "       "
-            msg1 = "<PLAY/Radio   NEXT>"
-            msg8 = "<VOLUME      SLEEP>"
+            msg1 = "STOP            PRE/NXT"
+            msg2 = ""
+            msg3 = ""
+            msg4 = ""
+            msg5 = ""
+            msg6 = ""
+            msg7 = ""
+            msg8 = "VOL+/-        SLEEP/SD"
             time.sleep(0.5)
+            display_screen()
             timer2 = time.monotonic()
         elif buttonVOLUP.is_pressed:
             Set_Volume()
             status()
             time.sleep(0.5)
-            if album_mode == 0:
-                track_n = str(Track_No + 1) + "     "
-            else:
-                track_n = "1/" + str(ctracks) + "       "
-            msg1 = "<PLAY/Radio   NEXT>"
-            msg8 = "<VOLUME      SLEEP>"
+            msg1 = "STOP           PRE/NXT"
+            msg2 = ""
+            msg3 = ""
+            msg4 = ""
+            msg5 = ""
+            msg6 = ""
+            msg7 = ""
+            msg8 = "VOL+/-       SLEEP/SD"
             display_screen()
             Disp_start = time.monotonic()
             timer2 = time.monotonic()
@@ -1260,22 +1294,31 @@ while True:
             Disp_on = 1
             Disp_start = time.monotonic()
             status()
-            msg1 = "<STOP         NEXT>"
+            msg1 = "STOP       PRE/NEXT"
+            msg2 = ""
+            msg3 = ""
+            msg4 = ""
+            msg5 = ""
+            msg6 = ""
+            msg7 = ""
+            display_screen()
             time.sleep(0.5)
             timer2 = time.monotonic()
         elif buttonNEXT.is_pressed:
             Disp_on = 1
             Disp_start = time.monotonic()
             timer1 = time.monotonic()
+            while buttonNEXT.is_pressed and time.monotonic() - timer1 < 1:
+                pass
             while buttonNEXT.is_pressed:
-              if time.monotonic() - timer1 > 1:
-                radio_stn +=3
-                if radio_stn > len(Radio_Stns)- 3:
-                   radio_stn = 0
-                msg1 = (Radio_Stns[radio_stn])
-                display_screen()
-                time.sleep(1)
-              else:
+                if time.monotonic() - timer1 > 1:
+                    radio_stn +=3
+                    if radio_stn > len(Radio_Stns) - 3:
+                        radio_stn = 0
+                    msg2 = (Radio_Stns[radio_stn])
+                    display_screen()
+                    time.sleep(1)
+            if time.monotonic() - timer1 < 1:        
                 radio_stn -=3
                 if radio_stn < 0:
                     radio_stn = len(Radio_Stns) - 3
@@ -1286,10 +1329,11 @@ while True:
             q = subprocess.Popen(["cvlc",Radio_Stns[radio_stn + 1]] ,shell=False)
             time.sleep(1)
             rs = Radio_Stns[radio_stn] + "               "[0:19]
+            headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
             defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
             with open(config_file, 'w') as f:
-                for item in defaults:
-                    f.write("%s\n" % item)
+                for item in range(0,len(headers)):
+                    f.write(headers[item] + " : " + str(defaults[item]) + "\n")
             timer2 = time.monotonic()
             time.sleep(1)
 
@@ -1299,7 +1343,13 @@ while True:
             Disp_on = 1
             Disp_start = time.monotonic()
             status()
-            msg1 = "<STOP         NEXT>"
+            msg1 = "STOP       PRE/NEXT"
+            msg2 = ""
+            msg3 = ""
+            msg4 = ""
+            msg5 = ""
+            msg6 = ""
+            msg7 = ""
             time.sleep(0.5)
             timer2 = time.monotonic()
         elif buttonPLAY.is_pressed:
@@ -1308,15 +1358,22 @@ while True:
             q.kill()
             radio = 0
             if len(tracks) > 0:
-                msg1 = "<PLAY/Radio   NEXT>"
+                msg1 = "PLAY/Radio  PRE/NXT"
             else:
                 msg1 = "Radio Stopped      "
+            msg2 = ""
             msg3 = ""
+            msg4 = ""
+            msg5 = ""
+            msg6 = ""
+            msg7 = ""
+            showit = 1
             display_screen()
+            headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
             defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
             with open(config_file, 'w') as f:
-                for item in defaults:
-                    f.write("%s\n" % item)
+                for item in range(0,len(headers)):
+                    f.write(headers[item] + " : " + str(defaults[item]) + "\n")
             time.sleep(2)
             
 
@@ -1325,7 +1382,14 @@ while True:
             Disp_on = 1
             Disp_start = time.monotonic()
             status()
-            msg1 = "<STOP         NEXT>"
+            msg1 = "STOP       PRE/NEXT"
+            msg2 = ""
+            msg3 = ""
+            msg4 = ""
+            msg5 = ""
+            msg6 = ""
+            msg7 = ""
+            display_screen()
             time.sleep(0.5)
             timer2 = time.monotonic()
         
@@ -1337,6 +1401,7 @@ while True:
             msg1 = "Set SLEEP.. " + str(int(sleep_timer/60))
             msg2 = "HOLD for 20 to SHUTDOWN "
             msg3 = ""
+            msg4 = ""
             msg5 = ""
             msg6 = ""
             msg7 = ""
@@ -1406,15 +1471,10 @@ while True:
         cplayed +=1
         if cplayed > ctracks and album_mode == 1:
             status()
-            msg1 = "<PLAY/Radio   NEXT>"
+            msg1 = "PLAY/Radio  PRE/NXT"
             msg2 = titles[0][0:19]
             msg3 = titles[1][0:19]
             msg4 = titles[2][0:19]
-            try:
-                if int(titles[2][0:2]) > 0:
-                    msg4 = titles[2][3:22]
-            except:
-                pass
             display_screen()
             MP3_Play = 0
             
@@ -1502,20 +1562,17 @@ while True:
           titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
           track = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/" + titles[2]
           if album_mode == 0:
-              msg1 = "<STOP/Radio   NEXT>"
+              msg1 = "STOP/Radio  PRE/NXT"
           else:
-              msg1 = "<STOP/Radio   NEXT>"
+              msg1 = "STOP/Radio  PRE/NXT"
           rpistr = "mplayer" + " -quiet " +  '"' + track + '"'
           msg2 = titles[0][0:19]
           msg3 = titles[1][0:19]
           msg4 = titles[2][0:19]
-          msg8 = "<VOLUME     SLEEP>"
-          try:
-              if int(titles[2][0:2]) > 0:
-                  msg4 = titles[2][3:22]
-          except:
-              pass
+          msg8 = "VOL+/-      SLEEP/SD"
           if Disp_on == 1:
+              ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+              pfiles = glob.glob(ptrack + "*.jpg")
               display_screen()
           audio = MP3(track)
           track_len = audio.info.length
@@ -1575,7 +1632,6 @@ while True:
                   old_secs2 = secs
                 
             time.sleep(0.2)
-
             played  = time.monotonic() - timer1
             played_pc = int((played/track_len) *100)
 
@@ -1590,6 +1646,8 @@ while True:
                 msg7 = ""
                 msg8 = ""
                 Disp_on = 0
+                if show_clock == 0 and screen == 0:
+                    disp.set_backlight(0)
                 display_screen()
            
             # display titles, status etc
@@ -1597,13 +1655,8 @@ while True:
                 msg2 = titles[0][0:19]
                 msg3 = titles[1][0:19]
                 msg4 = titles[2][0:19]
-                try:
-                    if int(titles[2][0:2]) > 0:
-                        msg4 = titles[2][3:22]
-                except:
-                    pass
                 played_pc =  "     " + str(played_pc)
-                msg1 = "<STOP/Radio   NEXT>"
+                msg1 = "STOP/Radio  PRE/NXT"
                 status()
                 msg6 = "Status...  " +  txt
                 if sleep_timer != 0:
@@ -1623,7 +1676,9 @@ while True:
                 if lsec < 10:
                     lsec2 = "0" + lsec2
                 msg5 = " " + str(pmin) + ":" + str(psec2) + " of " + str(lmin) + ":" + str(lsec2)
-                msg8 = "<VOLUME      SLEEP>"
+                msg8 = "VOL+/-       SLEEP/SD"
+                ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+                pfiles = glob.glob(ptrack + "*.jpg")
                 display_screen()
                    
             # check for PLAY/STOP/RADIO key
@@ -1631,7 +1686,7 @@ while True:
                 Disp_on = 1
                 Disp_start = time.monotonic()
                 status()
-                msg1 = "<STOP/Radio   NEXT>"
+                msg1 = "STOP/Radio  PRE/NXT"
                 time.sleep(0.5)
                 timer2 = time.monotonic()
             elif  buttonPLAY.is_pressed:
@@ -1643,7 +1698,7 @@ while True:
                 display_screen()
                 time.sleep(2)
                 status()
-                msg1 = "<PLAY/Radio   NEXT>"
+                msg1 = "PLAY/Radio  PRE/NXT"
                 msg2 = ""
                 msg3 = ""
                 msg4 = ""
@@ -1651,13 +1706,15 @@ while True:
                 msg6 = ""
                 msg7 = ""
                 msg8 = ""
+                showit = 1
                 display_screen()
                 go = 0
                 MP3_Play = 0
+                headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
                 defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
                 with open(config_file, 'w') as f:
-                    for item in defaults:
-                        f.write("%s\n" % item)
+                    for item in range(0,len(headers)):
+                        f.write(headers[item] + " : " + str(defaults[item]) + "\n")
                 timer2 = time.monotonic()
                 
             # check for NEXT/PREVIOUS TRACK key
@@ -1665,10 +1722,10 @@ while True:
                 Disp_on = 1
                 Disp_start = time.monotonic()
                 status()
-                msg1 = "<STOP/Radio   NEXT>"
+                msg1 = "STOP/Radio  PRE/NXT"
                 time.sleep(0.5)
                 timer2 = time.monotonic()
-            elif  buttonNEXT.is_pressed:
+            elif buttonNEXT.is_pressed:
                 Disp_on = 1
                 Disp_start = time.monotonic()
                 os.killpg(p.pid, SIGTERM)
@@ -1681,11 +1738,13 @@ while True:
                             Track_No += 1
                             if Track_No > len(tracks) - 1:
                                 Track_No = Track_No - len(tracks)
-                            msg1 = "<STOP/Radio   NEXT>"
+                            msg1 = "STOP/Radio  PRE/NXT"
                             titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                             msg2 = titles[0][0:19]
                             msg3 = titles[1][0:19]
                             msg4 = titles[2][0:19]
+                            ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+                            pfiles = glob.glob(ptrack + "*.jpg")
                             display_screen()
                             time.sleep(1)
                 if time.monotonic() - timer1 < 1:
@@ -1693,11 +1752,13 @@ while True:
                         Track_No -= 1
                         if Track_No < 0:
                             Track_No = len(tracks) + Track_No
-                    msg1 = "<PLAY/Radio   NEXT>"
+                    msg1 = "STOP/Radio  PRE/NXT"
                     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     msg2 = titles[0][0:19]
                     msg3 = titles[1][0:19]
                     msg4 = titles[2][0:19]
+                    ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
+                    pfiles = glob.glob(ptrack + "*.jpg")
                     display_screen()
                     time.sleep(1)
                 timer2 = time.monotonic()
@@ -1708,7 +1769,7 @@ while True:
                 Disp_on = 1
                 Disp_start = time.monotonic()
                 status()
-                msg1 = "<STOP/Radio   NEXT>"
+                msg1 = "STOP/Radio  PRE/NXT"
                 time.sleep(0.5)
                 timer2 = time.monotonic()
             elif buttonVOLUP.is_pressed:
@@ -1719,7 +1780,7 @@ while True:
                     track_n = str(Track_No + 1) + "     "
                 else:
                     track_n = "1/" + str(ctracks) + "       "
-                msg1 = "<STOP/Radio   NEXT>" 
+                msg1 = "STOP/Radio  PRE/NXT" 
                 display_screen()
                 Disp_start = time.monotonic()
                 timer2 = time.monotonic()
@@ -1730,7 +1791,7 @@ while True:
                 Disp_start = time.monotonic()
                 Disp_on = 1
                 status()
-                msg1 = "<STOP/Radio   NEXT>"
+                msg1 = "STOP/Radio  PRE/NXT"
                 display_screen()
                 time.sleep(1)
                 timer2 = time.monotonic()
