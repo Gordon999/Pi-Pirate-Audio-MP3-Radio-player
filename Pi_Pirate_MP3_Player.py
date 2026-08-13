@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.18"
+version  = "1.19"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -671,8 +671,10 @@ while True:
         # check for PLAY/STOP/RADIO key
         if buttonPLAY.is_pressed and Disp_on == 0:
             Disp_on = 1
+            showit  = 1
             Disp_start = time.monotonic()
             status()
+            msg = [""] * 8
             msg[0] = "PLAY/Radio  PRE/NXT"
             display_screen()
             time.sleep(0.5)
@@ -680,6 +682,7 @@ while True:
         elif buttonPLAY.is_pressed:
             stopped = 0
             Disp_on = 1
+            showit  = 1
             Disp_start = time.monotonic()
             timer1 = time.monotonic()
             msg = [""] * 8
@@ -1261,7 +1264,10 @@ while True:
             timer1 = time.monotonic()
             sleep_timer_start = time.monotonic()
             msg = [""] * 8
-            msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+            if sleep_timer > 0:
+                msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+            else:
+                msg[0] = "Set SLEEP.. OFF"
             msg[1] = "HOLD for 20 to SHUTDOWN "
             display_screen()
             while buttonSLEEP.is_pressed:
@@ -1270,7 +1276,10 @@ while True:
                      sleep_timer = 0
                 sleep_timer_start = time.monotonic()
                 msg = [""] * 8
-                msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                if sleep_timer > 0:
+                    msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                else:
+                    msg[0] = "Set SLEEP.. OFF"
                 display_screen()
                 time.sleep(1)
                 if time.monotonic() - timer1 > 10:
@@ -1470,6 +1479,12 @@ while True:
                         msg[6] = "Shutdown: " + str(time_left) + "mins"
                     else:
                         msg[6] = "Stopping: " + str(time_left) + "mins"
+                else:
+                    now = datetime.datetime.now()
+                    clock = now.strftime("%H:%M:%S")
+                    secs = now.strftime("%S")
+                    if show_clock == 1 and synced == 1:
+                        msg[6] = "     " + clock
                 pmin = int(played/60)
                 psec = int(played - (pmin * 60))
                 psec2 = str(psec)
@@ -1495,7 +1510,7 @@ while True:
                 display_screen()
                 time.sleep(0.5)
                 timer2 = time.monotonic()
-            elif  buttonPLAY.is_pressed:
+            elif buttonPLAY.is_pressed:
                 Disp_on = 1
                 Disp_start = time.monotonic()
                 timer1 = time.monotonic()
@@ -1620,7 +1635,10 @@ while True:
                         sleep_timer = 0
                 sleep_timer_start = time.monotonic()
                 msg = [""] * 8
-                msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                if sleep_timer > 0:
+                    msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                else:
+                    msg[0] = "Set SLEEP.. OFF"
                 msg[1] = "HOLD for 20 to SHUTDOWN "
                 display_screen()
                 time.sleep(1)
@@ -1630,7 +1648,10 @@ while True:
                         if sleep_timer > 7200:
                             sleep_timer = 0
                         sleep_timer_start = time.monotonic()
-                        msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                        if sleep_timer > 0:
+                            msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                        else:
+                            msg[0] = "Set SLEEP.. OFF"
                         display_screen()
                         time.sleep(1)
                     if time.monotonic() - timer1 > 10:
