@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.16"
+version  = "1.18"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -177,7 +177,6 @@ ctracks     = 0
 cplayed     = 0
 stopped     = 0
 atimer      = time.monotonic()
-played_pc   = 0
 synced      = 0
 reloading   = 0
 msg         = [""] * 8
@@ -269,7 +268,6 @@ def reload():
     msg[0] = ("Tracks: " + str(len(tracks)))
     Track_No = 0
     save_config()
-    display_screen()
     if len(tracks) == 0:
         msg[0] = "Tracks: " + str(len(tracks))
         msg[1] = "Stopped Checking"
@@ -544,13 +542,11 @@ display_screen()
 # read sync.txt file
 try:
     sync = []
-    display_screen()
     with open("/run/shm/sync.txt", "r") as file:
         line = file.readline()
         while line:
             sync.append(line.strip())
             line = file.readline()
-    display_screen()
     if sync[4] == "System clock synchronized: yes":
         synced = 1
         msg[1] = "Clock: Synced"
@@ -678,6 +674,7 @@ while True:
             Disp_start = time.monotonic()
             status()
             msg[0] = "PLAY/Radio  PRE/NXT"
+            display_screen()
             time.sleep(0.5)
             timer2 = time.monotonic()
         elif buttonPLAY.is_pressed:
@@ -728,7 +725,6 @@ while True:
                 time.sleep(0.05)
                 msg[0] = (Radio_Stns[radio_stn])
                 display_screen()
-                rs = Radio_Stns[radio_stn]
                 while buttonPLAY.is_pressed:
                     pass
                 radio    = 1
@@ -753,43 +749,43 @@ while True:
                 pass
             # NEXT TRACK
             if time.monotonic() - timer1 < 1:
-                    while titles[1] == old_album and titles[0] == old_artist and Track_No > -1:
-                        Track_No -=1
-                        titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    old_album = titles[1]
-                    old_artist = titles[0]
-                    while titles[1] == old_album and titles[0] == old_artist and Track_No > -1:
-                        Track_No -=1
-                        titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    Track_No +=1
-                    if Track_No > len(tracks) - 1:
-                        Track_No = Track_No - len(tracks)
+                while titles[1] == old_album and titles[0] == old_artist and Track_No > -1:
+                    Track_No -=1
                     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    old_album  = titles[1]
-                    old_artist = titles[0]
-                    Tack_No = Track_No
-                    stitles = [0,0,0,0,0,0,0]
+                old_album = titles[1]
+                old_artist = titles[0]
+                while titles[1] == old_album and titles[0] == old_artist and Track_No > -1:
+                    Track_No -=1
+                    titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
+                Track_No +=1
+                if Track_No > len(tracks) - 1:
+                    Track_No = Track_No - len(tracks)
+                titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
+                old_album  = titles[1]
+                old_artist = titles[0]
+                Tack_No = Track_No
+                stitles = [0,0,0,0,0,0,0]
+                stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
+                talbum = stitles[1]
+                tartist = stitles[0]
+                while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
                     stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    talbum = stitles[1]
-                    tartist = stitles[0]
-                    while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                        Tack_No +=1
-                    ctracks = Tack_No - Track_No - 1
-                    pfiles = []
-                    ptrack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/"
-                    pfiles = glob.glob(ptrack + "*.jpg")
-                    msg[0] = "PLAY/Radio  PRE/NXT" 
-                    time.sleep(0.05)
-                    msg[1] = titles[0][0:19]
-                    msg[2] = titles[1][0:19]
-                    msg[3] = titles[2][0:19]
-                    display_screen()
-                    time.sleep(0.05)
-                    timer3 = time.monotonic()
-                    album = 1
-                    time.sleep(0.5)
+                    strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
+                    Tack_No +=1
+                ctracks = Tack_No - Track_No - 1
+                pfiles = []
+                ptrack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/"
+                pfiles = glob.glob(ptrack + "*.jpg")
+                msg[0] = "PLAY/Radio  PRE/NXT" 
+                time.sleep(0.05)
+                msg[1] = titles[0][0:19]
+                msg[2] = titles[1][0:19]
+                msg[3] = titles[2][0:19]
+                display_screen()
+                time.sleep(0.05)
+                timer3 = time.monotonic()
+                album = 1
+                time.sleep(0.5)
             if time.monotonic() - timer1 > 1:
                 # NEXT ALBUM
                 showit = 1
@@ -882,21 +878,21 @@ while True:
             timer1 = time.monotonic()
             timer = time.monotonic()
             if gapless == 0:
-                    gap = gaptime
-                    gapless = 1
-                    msg = [""] * 8
-                    msg[0] = "PLAY/Radio  PRE/NXT"
-                    msg[1] = "Gapless ON"
-                    display_screen()
-                    time.sleep(1)
+                gap = gaptime
+                gapless = 1
+                msg = [""] * 8
+                msg[0] = "PLAY/Radio  PRE/NXT"
+                msg[1] = "Gapless ON"
+                display_screen()
+                time.sleep(1)
             else:
-                    gap = 0
-                    gapless = 0
-                    msg = [""] * 8
-                    msg[0] = "PLAY/Radio  PRE/NXT"
-                    msg[1] = "Gapless OFF"
-                    display_screen()
-                    time.sleep(1)
+                gap = 0
+                gapless = 0
+                msg = [""] * 8
+                msg[0] = "PLAY/Radio  PRE/NXT"
+                msg[1] = "Gapless OFF"
+                display_screen()
+                time.sleep(1)
             status()
             if album_mode == 0:
                     track_n = str(Track_No + 1) + "     "
@@ -1125,7 +1121,7 @@ while True:
             else:
                 msg[3] = "Stopping: " + str(time_left) + "mins"
         if show_clock == 1 and synced == 1:
-            msg[2] = "      " + clock
+            msg[2] = "        " + clock
         t = ""
         for r in range (0,random.randint(0,10)):
             t += " "
@@ -1188,25 +1184,36 @@ while True:
                     radio_stn +=3
                     if radio_stn > len(Radio_Stns) - 3:
                         radio_stn = 0
-                    if Radio_Stns[radio_stn + 2] == 0:
-                        msg[1] = (Radio_Stns[radio_stn])
-                    else:
-                        msg[1] = ""
+                    if Radio_Stns[radio_stn][0:1] == "#":
+                        radio_stn +=3
+                    if radio_stn > len(Radio_Stns) - 3:
+                        radio_stn = 0
+                    msg[1] = (Radio_Stns[radio_stn])
+                    now = datetime.datetime.now()
+                    clock = now.strftime("%H:%M:%S")
+                    secs = now.strftime("%S")
+                    if show_clock == 1 and synced == 1:
+                        msg[2] = "        " + clock
                     display_screen()
                     time.sleep(0.5)
             if time.monotonic() - timer1 < 1:        
                 radio_stn -=3
                 if radio_stn < 0:
                     radio_stn = len(Radio_Stns) - 3
-                if Radio_Stns[radio_stn + 2] == 0:
-                    msg[1] = (Radio_Stns[radio_stn])
-                else:
-                    msg[1] = ""
+                if Radio_Stns[radio_stn][0:1] == "#":
+                    radio_stn -=3
+                if radio_stn < 0:
+                    radio_stn = len(Radio_Stns) - 3
+                msg[1] = (Radio_Stns[radio_stn])
+                now = datetime.datetime.now()
+                clock = now.strftime("%H:%M:%S")
+                secs = now.strftime("%S")
+                if show_clock == 1 and synced == 1:
+                    msg[2] = "        " + clock
                 display_screen()
             q.kill()
             q = subprocess.Popen(["cvlc",Radio_Stns[radio_stn + 1]] ,shell=False)
             time.sleep(1)
-            #rs = Radio_Stns[radio_stn] + "               "[0:19]
             save_config()
             timer2 = time.monotonic()
             time.sleep(1)
@@ -1418,7 +1425,7 @@ while True:
           while poll == None and track_len - played > gap and (time.monotonic() - sleep_timer_start < sleep_timer or sleep_timer == 0):
             time_left = int((sleep_timer - (time.monotonic() - sleep_timer_start))/60)
                 
-            # display clock (if enabled and synced)
+            # display clock whilst timed out (if enabled and synced)
             if show_clock == 1 and Disp_on == 0 and synced == 1:
                 now = datetime.datetime.now()
                 clock = now.strftime("%H:%M:%S")
@@ -1439,7 +1446,6 @@ while True:
                 
             time.sleep(0.2)
             played  = time.monotonic() - timer1
-            played_pc = int((played/track_len) *100)
 
             # DISPLAY OFF timer
             if time.monotonic() - Disp_start > Disp_timer and Disp_timer > 0 and Disp_on == 1:
@@ -1454,7 +1460,6 @@ while True:
                 msg[1] = titles[0][0:19]
                 msg[2] = titles[1][0:19]
                 msg[3] = titles[2][0:19]
-                played_pc =  "     " + str(played_pc)
                 msg[0] = "STOP/Radio  PRE/NXT"
                 status()
                 msg[5] = "Status...  " +  txt
