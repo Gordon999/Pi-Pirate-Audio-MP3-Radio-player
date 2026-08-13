@@ -8,8 +8,9 @@ Features:
     * Random mode
     * Gapless mode
     * Adjust Volume
-    * Sleep
-    * show album picture
+    * Sleep timer
+    * show album cover picture
+    * show radio station logo picture
 
 TESTED with RaspiOS 32bit BOOKWORM, and TRIXIE 64bit
 
