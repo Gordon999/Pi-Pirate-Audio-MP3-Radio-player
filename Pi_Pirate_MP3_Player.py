@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.21"
+version  = "1.22"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -186,6 +186,7 @@ usb_found   = 0
 relno       = 0
 stop        = 0
 pfiles      = []
+ptrack      = ""
 showit      = 1
 
 # find username
@@ -194,7 +195,7 @@ h_user.append(os.getlogin())
 
 def display_screen():
     global image,top,msg,font,img,WIDTH,HEIGHT
-    global MP3_Play,radio,screen,font_size,radio,Radio_Stns,radio_stn,pfiles,Disp_on
+    global MP3_Play,radio,screen,font_size,radio,Radio_Stns,radio_stn,pfiles,Disp_on,ptrack
     clrs = [(255,255,0),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,0)]
     if screen == 0: # st7789 screen
         if Disp_on == 1:
@@ -210,17 +211,35 @@ def display_screen():
                 img  = img.resize((240,240),resample=Image.LANCZOS)
                 draw = ImageDraw.Draw(img)
                 for x in range(0,8):
-                    draw.text((0, x * 30), msg[x], font=font, fill=clrs[x])
+                    if os.path.exists(ptrack + "colors.txt"):
+                        with open(ptrack + "colors.txt", "r") as file:
+                             line = file.readline()
+                        r,g,b = line.split(",")
+                        draw.text((0, x * 30), msg[x], font=font, fill=(int(r),int(g),int(b)))
+                    else:
+                        draw.text((0, x * 30), msg[x], font=font, fill=clrs[x])
         else:
             img  = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
             draw = ImageDraw.Draw(img)
-            draw.rectangle((0, 0, 240, 240), (0, 0, 0))
+            if os.path.exists(ptrack + "backgnd.txt"):
+                with open(ptrack + "backgnd.txt", "r") as file:
+                    line = file.readline()
+                    r,g,b = line.split(",")
+                    draw.rectangle((0, 0, 240, 240), (int(r),int(g),int(b)))
+            else:
+                draw.rectangle((0, 0, 240, 240), (0, 0, 0))
             for x in range(0,8):
                 draw.text((0, x * 30), msg[x], font=font, fill=clrs[x])
         disp.display(img)
     elif screen == 1: # pygame screen
         fontObj = pygame.font.Font(None,font_size)
-        pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(0,0,240,240))
+        if os.path.exists(ptrack + "backgnd.txt"):
+            with open(ptrack + "backgnd.txt", "r") as file:
+                line = file.readline()
+                r,g,b = line.split(",")
+                pygame.draw.rect(windowSurfaceObj,(int(r),int(g),int(b)),Rect(0,0,240,240))
+        else:
+                pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(0,0,240,240))
         if radio == 1 and os.path.exists(Radio_Stns[radio_stn] + ".jpg") and Disp_on == 1:
             image = pygame.image.load(Radio_Stns[radio_stn] + ".jpg")
             image = pygame.transform.scale(image,(240,240))
@@ -230,7 +249,13 @@ def display_screen():
             image = pygame.transform.scale(image,(240,240))
             windowSurfaceObj.blit(image,(0,0))
         for x in range(0,8):
-            msgSurfaceObj = fontObj.render(msg[x], False,clrs[x])
+            if os.path.exists(ptrack + "colors.txt"):
+                with open(ptrack + "colors.txt", "r") as file:
+                    line = file.readline()
+                    r,g,b = line.split(",")
+                    msgSurfaceObj = fontObj.render(msg[x], False,(int(r),int(g),int(b)))
+            else:
+                msgSurfaceObj = fontObj.render(msg[x], False,clrs[x])
             msgRectobj = msgSurfaceObj.get_rect()
             msgRectobj.topleft = (10,x * font_size)
             windowSurfaceObj.blit(msgSurfaceObj, msgRectobj)
