@@ -20,6 +20,10 @@ on the sd card under /home/USERNAME/Music/Artist Name/Album Name/Track Names
 
 Put Album Cover images in Album Name directory, use .jpgs and ideally 240 x 240.
 
+If you can't see the text on the image you can add a file called colors.txt in the Album Name directory containing r,g,b values eg. 0,0,0 for black.
+
+If you don't have an image and want a colored backround you can add a file called backgnd.txt in the Album Name directory containing r,g,b values eg. 200,0,0 for red.
+
 Put Radio Station logo images in /home/USERNAME/, use .jpgs and ideally 240 x 240. Name must be same as Radio Stn + .jpg.
 eg Radio Paradise Rock.jpg.
 
