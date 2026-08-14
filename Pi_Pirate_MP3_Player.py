@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.19"
+version  = "1.20"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -230,7 +230,7 @@ def display_screen():
             image = pygame.transform.scale(image,(240,240))
             windowSurfaceObj.blit(image,(0,0))
         for x in range(0,8):
-            msgSurfaceObj = fontObj.render(data[x], False,clrs[x])
+            msgSurfaceObj = fontObj.render(msg[x], False,clrs[x])
             msgRectobj = msgSurfaceObj.get_rect()
             msgRectobj.topleft = (10,x * font_size)
             windowSurfaceObj.blit(msgSurfaceObj, msgRectobj)
@@ -490,22 +490,32 @@ if album_mode == 1 and len(tracks) > 0:
     # determine album length and number of tracks
     cplayed = 0
     shuffled = 0
-    if album_mode == 1:
-        Tack_No = Track_No
-        stimer  = 0
-        stitles = [0,0,0,0,0,0,0]
+    tracks.sort()
+    Tack_No = Track_No
+    stimer  = 0
+    stitles = [0,0,0,0,0,0,0]
+    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
+    talbum  = stitles[1]
+    tartist = stitles[0]
+    while stitles[1] == talbum and stitles[0] == tartist and Tack_No > -1:
         stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-        talbum  = stitles[1]
-        tartist = stitles[0]
-        while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-            stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-            strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-            audio = MP3(strack)
-            stimer += audio.info.length
-            Tack_No +=1
+        Tack_No -=1
+    Tack_No +=1
+    if Tack_No > 0:
+        Tack_No +=1
+    Strack_No = Tack_No
+    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
+    strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
+    while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
+        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
+        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
         audio = MP3(strack)
-        stimer -= audio.info.length
-        ctracks = Tack_No - Track_No - 1
+        stimer += audio.info.length
+        Tack_No +=1
+    audio = MP3(strack)
+    stimer -= audio.info.length
+    ctracks = Tack_No - Track_No - 1
+    Track_No = Strack_No
 
 status()
     
