@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.20"
+version  = "1.21"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -760,10 +760,12 @@ while True:
             timer1 = time.monotonic()
             while buttonNEXT.is_pressed and time.monotonic() - timer1 < 1:
                 pass
-            # NEXT TRACK
             if time.monotonic() - timer1 < 1:
+				# PREVIOUS ALBUM
                 while titles[1] == old_album and titles[0] == old_artist and Track_No > -1:
                     Track_No -=1
+                    if Track_No < 0:
+                        Track_No = len(tracks) - 1
                     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                 old_album = titles[1]
                 old_artist = titles[0]
@@ -803,8 +805,10 @@ while True:
                 # NEXT ALBUM
                 showit = 1
                 while buttonNEXT.is_pressed and buttonSLEEP.is_pressed == 0 and buttonVOLUP.is_pressed == 0:
-                    while titles[1] == old_album and titles[0] == old_artist and Track_No < len(tracks) - 1:
+                    while titles[1] == old_album and titles[0] == old_artist:
                         Track_No +=1
+                        if Track_No > len(tracks) - 1:
+                            Track_No = 0
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     old_album  = titles[1]
                     old_artist = titles[0]
@@ -822,6 +826,7 @@ while True:
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
+                    msg[7] = "NEXT A-Z     ARTIST" 
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                     pfiles = glob.glob(ptrack + "*.jpg")
@@ -829,8 +834,10 @@ while True:
                     time.sleep(0.5)
                 # NEXT ARTIST
                 while buttonNEXT.is_pressed and buttonSLEEP.is_pressed:
-                    while titles[0] == old_artist and Track_No < len(tracks) - 1:
+                    while titles[0] == old_artist:
                         Track_No +=1
+                        if Track_No > len(tracks) - 1:
+                            Track_No = 0
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     old_artist = titles[0]
                     Tack_No = Track_No
@@ -845,6 +852,7 @@ while True:
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
+                    msg[7] = "NEXT A-Z     ARTIST"
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                     pfiles = glob.glob(ptrack + "*.jpg")
@@ -852,8 +860,10 @@ while True:
                     time.sleep(0.5)
                 # NEXT A-Z ARTIST    
                 while buttonNEXT.is_pressed and buttonVOLUP.is_pressed:
-                    while titles[0][0:1] == old_artist[0:1] and Track_No < len(tracks) - 1:
+                    while titles[0][0:1] == old_artist[0:1]: 
                         Track_No +=1
+                        if Track_No > len(tracks) - 1:
+                            Track_No = 0
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     old_artist = titles[0]
                     Tack_No = Track_No
@@ -868,6 +878,7 @@ while True:
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
+                    msg[7] = "NEXT A-Z     ARTIST"
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                     pfiles = glob.glob(ptrack + "*.jpg")
