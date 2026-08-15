@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.22"
+version  = "1.23"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -53,6 +53,7 @@ Disp_timer   = 60  # Display timeout in seconds, set to 0 to disable
 show_clock   = 1   # set to 1 to show clock, only use if on web or using RTC
 gaptime      = 2   # set pre-start time for gapless, in seconds
 screen       = 0   # for testing, 0 = ST7789, 1 = pygame screen
+banners      = 0   # set to 1 to add black backgrounds on rows 1 and 8
 
 Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",0,
               "Radio Paradise Main","http://stream.radioparadise.com/mp3-320",0,
@@ -195,7 +196,7 @@ h_user.append(os.getlogin())
 
 def display_screen():
     global image,top,msg,font,img,WIDTH,HEIGHT
-    global MP3_Play,radio,screen,font_size,radio,Radio_Stns,radio_stn,pfiles,Disp_on,ptrack
+    global MP3_Play,radio,screen,font_size,radio,Radio_Stns,radio_stn,pfiles,Disp_on,ptrack,banners
     clrs = [(255,255,0),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,255),(255,255,0)]
     if screen == 0: # st7789 screen
         if Disp_on == 1:
@@ -204,18 +205,32 @@ def display_screen():
             with Image.open(Radio_Stns[radio_stn] + ".jpg") as img:
                 img  = img.resize((240,240),resample=Image.LANCZOS)
                 draw = ImageDraw.Draw(img)
+                if banners == 1:
+                    draw.rectangle((0, 0, 240, 20), (0, 0, 0))
+                    draw.rectangle((0, 212, 240, 240), (0, 0, 0))
                 for x in range(0,8):
                     draw.text((0, x * 30), msg[x], font=font, fill=clrs[x])
         elif radio == 0 and len(pfiles) > 0 and os.path.exists(pfiles[0]) and Disp_on == 1:
             with Image.open(pfiles[0]) as img:
                 img  = img.resize((240,240),resample=Image.LANCZOS)
                 draw = ImageDraw.Draw(img)
+                if banners == 1:
+                    draw.rectangle((0, 0, 240, 20), (0, 0, 0))
+                    draw.rectangle((0, 212, 240, 240), (0, 0, 0))
                 for x in range(0,8):
                     if os.path.exists(ptrack + "colors.txt"):
+                        tclrs = []
                         with open(ptrack + "colors.txt", "r") as file:
                              line = file.readline()
-                        r,g,b = line.split(",")
-                        draw.text((0, x * 30), msg[x], font=font, fill=(int(r),int(g),int(b)))
+                             while line:
+                                 line = line.strip()
+                                 r,g,b = line.split(",")
+                                 tclrs.append(tuple((int(r),int(g),int(b))))
+                                 line = file.readline()
+                        if len(tclrs) < 8:
+                            draw.text((0, x * 30), msg[x], font=font, fill=(tclrs[0]))
+                        else:
+                            draw.text((0, x * 30), msg[x], font=font, fill=(tclrs[x]))
                     else:
                         draw.text((0, x * 30), msg[x], font=font, fill=clrs[x])
         else:
@@ -244,16 +259,31 @@ def display_screen():
             image = pygame.image.load(Radio_Stns[radio_stn] + ".jpg")
             image = pygame.transform.scale(image,(240,240))
             windowSurfaceObj.blit(image,(0,0))
+            if banners == 1:
+                pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(0,0,240,19))
+                pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(0,210,240,240))
         elif radio == 0 and len(pfiles) > 0 and os.path.exists(pfiles[0]) and Disp_on == 1:
             image = pygame.image.load(pfiles[0])
             image = pygame.transform.scale(image,(240,240))
             windowSurfaceObj.blit(image,(0,0))
+            if banners == 1:
+                pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(0,0,240,19))
+                pygame.draw.rect(windowSurfaceObj,(0,0,0),Rect(0,210,240,240))
         for x in range(0,8):
             if os.path.exists(ptrack + "colors.txt"):
                 with open(ptrack + "colors.txt", "r") as file:
-                    line = file.readline()
-                    r,g,b = line.split(",")
-                    msgSurfaceObj = fontObj.render(msg[x], False,(int(r),int(g),int(b)))
+                    tclrs = []
+                    with open(ptrack + "colors.txt", "r") as file:
+                         line = file.readline()
+                         while line:
+                             line = line.strip()
+                             r,g,b = line.split(",")
+                             tclrs.append(tuple((int(r),int(g),int(b))))
+                             line = file.readline()
+                    if len(tclrs) < 8:
+                        msgSurfaceObj = fontObj.render(msg[x], False,(tclrs[0]))
+                    else:
+                        msgSurfaceObj = fontObj.render(msg[x], False,(tclrs[x]))
             else:
                 msgSurfaceObj = fontObj.render(msg[x], False,clrs[x])
             msgRectobj = msgSurfaceObj.get_rect()
