@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.26"
+version  = "1.27"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -1579,9 +1579,12 @@ while True:
                                 asofar = 0
                                 for q in range(0,Track_No - astrack):
                                     asofar += itracks[q]
+                                # determine time left of album
                                 aleft = 0
                                 for q in range((Track_No - astrack),ctracks):
                                     aleft += itracks[q]
+                                if sleep_timer > 0:
+                                     sleep_timer = aleft + 60
                             if Track_No > len(tracks) - 1:
                                 Track_No = Track_No - len(tracks)
                             msg[0] = "STOP/Radio  PRE/NXT"
@@ -1605,9 +1608,12 @@ while True:
                             asofar = 0
                             for q in range(0,Track_No - astrack):
                                 asofar += itracks[q]
+                            # determine time left of album
                             aleft = 0
                             for q in range((Track_No - astrack),ctracks):
                                 aleft += itracks[q]
+                            if sleep_timer > 0:
+                                sleep_timer = aleft + 60
                         if Track_No < 0:
                             Track_No = len(tracks) + Track_No
                     msg[0] = "STOP/Radio  PRE/NXT"
