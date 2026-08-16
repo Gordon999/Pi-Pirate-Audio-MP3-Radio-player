@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.23"
+version  = "1.25"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -173,11 +173,9 @@ old_secs    = "00"
 old_secs2   = "00"
 Disp_on     = 1
 album       = 0
-stimer      = 0
+atimer      = 0
 ctracks     = 0
-cplayed     = 0
 stopped     = 0
-atimer      = time.monotonic()
 synced      = 0
 reloading   = 0
 msg         = [""] * 8
@@ -189,6 +187,7 @@ stop        = 0
 pfiles      = []
 ptrack      = ""
 showit      = 1
+asofar      = 0
 
 # find username
 h_user  = []
@@ -520,7 +519,7 @@ else:
 # disable Radio Play if MP3 Play set
 if MP3_Play == 1:
     radio = 0
-    
+        
 # wait for internet connection
 if radio == 1:
     msg[0] = "Waiting for Radio..."
@@ -541,37 +540,46 @@ if len(tracks) > 0:
     if not os.path.exists(track) and stop == 0:
         reload()
 
-if album_mode == 1 and len(tracks) > 0:
-    # determine album length and number of tracks
-    cplayed = 0
-    shuffled = 0
+def album_length():
+	# determine album length and number of tracks
+    global tracks,Track_No,ctracks,atimer,astrack,itracks
+    itracks = [0] * 70 
+    # find first track of Album
+    titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
+    new_artist = titles[0]
+    new_album  = titles[1]
     tracks.sort()
-    Tack_No = Track_No
-    stimer  = 0
+    Track_No = 0
+    titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
+    while new_artist != titles[0] or new_album != titles[1]:
+        titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
+        Track_No +=1
+    Track_No -=1
+    astrack = Track_No
+    # find number of Album tracks and album timings
+    Tack_No = Track_No 
+    atimer  = 0
     stitles = [0,0,0,0,0,0,0]
     stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-    talbum  = stitles[1]
+    talbum = stitles[1]
     tartist = stitles[0]
-    while stitles[1] == talbum and stitles[0] == tartist and Tack_No > -1:
-        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-        Tack_No -=1
-    Tack_No +=1
-    if Tack_No > 0:
-        Tack_No +=1
-    Strack_No = Tack_No
-    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-    strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
+    itr = 0
     while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
         stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
         strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
         audio = MP3(strack)
-        stimer += audio.info.length
+        atimer += audio.info.length
+        itracks[itr] = audio.info.length
         Tack_No +=1
+        itr +=1
     audio = MP3(strack)
-    stimer -= audio.info.length
+    atimer -= audio.info.length
     ctracks = Tack_No - Track_No - 1
-    Track_No = Strack_No
-
+    
+if album_mode == 1 and len(tracks) > 0:
+    shuffled = 0
+    tracks.sort()
+    album_length()
 status()
     
 if shuffled == 1 and gapless == 0:
@@ -593,6 +601,7 @@ Disp_start        = time.monotonic()
 timer2            = time.monotonic()
 sync_timer        = time.monotonic()
 xt                = 0
+atime             = time.monotonic()
 
 # check if clock synchronised
 msg[0] = "Checking clock..."
@@ -649,7 +658,7 @@ while True:
             except:
                 pass
             
-        # display Artist / Album / Track names
+        # Display Artist / Album / Track names
         if Disp_on == 1 and showit == 1:
           showit = 0
           msg = [""] * 8
@@ -658,6 +667,8 @@ while True:
             msg[1] = titles[0][0:19] # Artist
             msg[2] = titles[1][0:19] # Album
             msg[3] = titles[2][0:19] # Track
+            if album_mode == 1:
+                msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
             # find album cover image
             ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
             pfiles = glob.glob(ptrack + "*.jpg")
@@ -697,24 +708,27 @@ while True:
                 disp.set_backlight(0)
             display_screen()
             
-        # sleep_timer timer
+        # check sleep_timer
         if time.monotonic() - sleep_timer_start > sleep_timer and sleep_timer > 0:
             Disp_start = time.monotonic()
             abort_sd = 0
             t = 30
             while t > 0 and abort_sd == 0:
+				# count down to stop / shutdown
                 if sleep_shutdn == 1:
                     msg[1] = "SHUTDOWN in " + str(t)
                 else:
                     msg[1] = "STOPPING in " + str(t)
                 display_screen()
                 if buttonSLEEP.is_pressed or buttonPLAY.is_pressed:
+					# abort stop / shutdown if button pressed
                     sleep_timer_start = time.monotonic()
                     sleep_timer = 900
                     abort_sd = 1
                 t -=1
                 time.sleep(1)
             if abort_sd == 0:
+				# stop or shutdown
                 msg = [""] * 8
                 if sleep_shutdn == 1:
                     msg[0] = "SHUTTING DOWN..."
@@ -728,6 +742,7 @@ while True:
                 if sleep_shutdn == 1:
                     os.system("sudo shutdown -h now")
             else:
+				# aborted stop / shutdown
                 status()
                 msg[0] = "PLAY/Radio  PRE/NXT"
                 display_screen()
@@ -759,33 +774,18 @@ while True:
             while buttonPLAY.is_pressed and time.monotonic() - timer1 < 3:
                 pass
             if time.monotonic() - timer1 < 3 and len(tracks) > 0:
-                # determine album length and number of tracks
-                cplayed = 0
+				# PLAY MP3
                 if album_mode == 1:
-                    Tack_No = Track_No
-                    stimer  = 0
-                    stitles = [0,0,0,0,0,0,0]
-                    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    talbum = stitles[1]
-                    tartist = stitles[0]
-                    ptrack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/"
-                    pfiles = glob.glob(ptrack + "*.jpg")
-                        
-                    while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                        audio = MP3(strack)
-                        stimer += audio.info.length
-                        Tack_No +=1
-                    audio = MP3(strack)
-                    stimer -= audio.info.length
-                    ctracks = Tack_No - Track_No - 1
-                atimer = time.monotonic()
+                    atime  = time.monotonic()
+                    asofar = 0
+					# determine album length and number of tracks
+                    album_length()
                 MP3_Play = 1
                 radio    = 0
                 time.sleep(2)
                 save_config()
             else:
+				# PLAY RADIO
                 msg[1] = ""
                 msg[2] = ""
                 msg[3] = ""
@@ -833,24 +833,17 @@ while True:
                 titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                 old_album  = titles[1]
                 old_artist = titles[0]
-                Tack_No = Track_No
-                stitles = [0,0,0,0,0,0,0]
-                stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                talbum = stitles[1]
-                tartist = stitles[0]
-                while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                    Tack_No +=1
-                ctracks = Tack_No - Track_No - 1
+                album_length()
                 pfiles = []
-                ptrack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/"
+                ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                 pfiles = glob.glob(ptrack + "*.jpg")
                 msg[0] = "PLAY/Radio  PRE/NXT" 
                 time.sleep(0.05)
                 msg[1] = titles[0][0:19]
                 msg[2] = titles[1][0:19]
                 msg[3] = titles[2][0:19]
+                if album_mode == 1:
+                    msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
                 display_screen()
                 time.sleep(0.05)
                 timer3 = time.monotonic()
@@ -867,20 +860,13 @@ while True:
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     old_album  = titles[1]
                     old_artist = titles[0]
-                    Tack_No = Track_No
-                    stitles = [0,0,0,0,0,0,0]
-                    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    talbum = stitles[1]
-                    tartist = stitles[0]
-                    while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                        Tack_No +=1
-                    ctracks = Tack_No - Track_No - 1
+                    album_length()
                     msg[0] = "PLAY/Radio  PRE/NXT" 
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
+                    if album_mode == 1:
+                        msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
                     msg[7] = "NEXT A-Z     ARTIST" 
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
@@ -895,18 +881,12 @@ while True:
                             Track_No = 0
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     old_artist = titles[0]
-                    Tack_No = Track_No
-                    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    talbum = stitles[1]
-                    tartist = stitles[0]
-                    while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                        Tack_No +=1
-                    ctracks = Tack_No - Track_No - 1
+                    album_length()
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
+                    if album_mode == 1:
+                        msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
                     msg[7] = "NEXT A-Z     ARTIST"
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
@@ -921,18 +901,12 @@ while True:
                             Track_No = 0
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     old_artist = titles[0]
-                    Tack_No = Track_No
-                    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    talbum = stitles[1]
-                    tartist = stitles[0]
-                    while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                        Tack_No +=1
-                    ctracks = Tack_No - Track_No - 1
+                    album_length()
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
+                    if album_mode == 1:
+                        msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
                     msg[7] = "NEXT A-Z     ARTIST"
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
@@ -957,6 +931,7 @@ while True:
             timer1 = time.monotonic()
             timer = time.monotonic()
             if gapless == 0:
+				# switch ON GAPLESS
                 gap = gaptime
                 gapless = 1
                 msg = [""] * 8
@@ -965,6 +940,7 @@ while True:
                 display_screen()
                 time.sleep(1)
             else:
+				# switch OFF GAPLESS
                 gap = 0
                 gapless = 0
                 msg = [""] * 8
@@ -973,10 +949,6 @@ while True:
                 display_screen()
                 time.sleep(1)
             status()
-            if album_mode == 0:
-                    track_n = str(Track_No + 1) + "     "
-            else:
-                    track_n = "1/" + str(ctracks) + "       "
             msg[0] = "PLAY/Radio  PRE/NXT"
             display_screen()
             save_config()
@@ -1020,42 +992,18 @@ while True:
                 pass
             if time.monotonic() - timer1 < 1:
                 if album_mode == 0:
+					# switch ALBUM MODE ON
                     album_mode = 1
-                    shuffled    = 0
-                    titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    new_artist = titles[0]
-                    new_album  = titles[1]
-                    tracks.sort()
-                    Track_No = 0
-                    titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    while new_artist != titles[0] or new_album != titles[1]:
-                        titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                        Track_No +=1
-                    Track_No -=1
-                    msg = [""] * 8
+                    shuffled   = 0
+                    msg    = [""] * 8
                     msg[0] = "PLAY/Radio  PRE/NXT"
                     msg[1] = "Album Mode ON "
-                    Tack_No = Track_No 
-                    stimer  = 0
-                    stitles = [0,0,0,0,0,0,0]
-                    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    talbum = stitles[1]
-                    tartist = stitles[0]
-                    while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                        audio = MP3(strack)
-                        stimer += audio.info.length
-                        Tack_No +=1
-                    audio = MP3(strack)
-                    stimer -= audio.info.length
-                    ctracks = Tack_No - Track_No - 1
-                    track_n = str(cplayed) + "/" + str(ctracks) + "       "
+                    album_length()
                 else:
+					# switch ALBUM MODE OFF
                     album_mode = 0
                     msg = [""] * 8
                     msg[1] = "Album Mode OFF "
-                    track_n  = str(Track_No) + "     "
                 save_config()
                 ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                 pfiles = glob.glob(ptrack + "*.jpg")
@@ -1064,16 +1012,17 @@ while True:
 
             else:  
                 msg = [""] * 8
-                msg[0] = "PLAY/Radio  PRE/NXT"  
+                msg[0] = "PLAY/Radio  PRE/NXT" 
                 if shuffled == 0:
-                    shuffled = 1
+					# shuffle tracks 
+                    shuffled   = 1
+                    album_mode = 0
                     shuffle(tracks)
                     Track_No = 0
-                    album_mode = 0
-                    track_n  = str(Track_No + 1) + "     "
                     msg[1] = "Random Mode ON "
                    
                 else:
+					# unshuffle tracks 
                     shuffled = 0
                     msg[1] = "Random Mode OFF "
                     itles[0],itles[1],itles[2],itles[3],itles[4],itles[5],itles[6] = tracks[Track_No].split("/")
@@ -1083,29 +1032,14 @@ while True:
                     while titles[0] != itles[0] or titles[1] != itles[1]:
                         Track_No +=1
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    track_n  = str(Track_No) + "     "
                     if album_mode == 1:
-                        Tack_No = Track_No
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        talbum = stitles[1]
-                        tartist = stitles[0]
-                        while stitles[1] == talbum and stitles[0] == tartist and Tack_No < len(tracks):
-                            stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                            strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                            Tack_No +=1
-                        ctracks = Tack_No - Track_No - 1
-                        album_mode = 1
-                        track_n = "1/" + str(ctracks) + "       "
+                        album_length()
                 display_screen()
                 save_config()
                 time.sleep(1)
                 timer2 = time.monotonic()
                 xt = 2
             status()
-            if album_mode == 0:
-                track_n = str(Track_No + 1) + "     "
-            else:
-                track_n = "1/" + str(ctracks) + "       "
             msg[0] = "PLAY/Radio  PRE/NXT"
             ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
             pfiles = glob.glob(ptrack + "*.jpg")
@@ -1405,8 +1339,7 @@ while True:
                 pass
                 
         # stop playing if end of album, in album mode
-        cplayed +=1
-        if cplayed > ctracks and album_mode == 1:
+        if Track_No > (astrack + ctracks) - 1 and album_mode == 1:
             status()
             msg[0] = "PLAY/Radio  PRE/NXT"
             msg[1] = titles[0][0:19]
@@ -1457,7 +1390,6 @@ while True:
                 MP3_Play = 0
             else:
                 status()
-                msg[0] = "Play.." + str(track_n)[0:5] + txt
                 display_screen()
                 time.sleep(0.05)
                 Disp_start = time.monotonic()
@@ -1561,17 +1493,31 @@ while True:
                     secs = now.strftime("%S")
                     if show_clock == 1 and synced == 1:
                         msg[6] = "     " + clock
-                pmin = int(played/60)
-                psec = int(played - (pmin * 60))
-                psec2 = str(psec)
-                if psec < 10:
-                    psec2 = "0" + psec2
-                lmin = int(track_len/60)
-                lsec = int(track_len - (lmin * 60))
-                lsec2 = str(lsec)
-                if lsec < 10:
-                    lsec2 = "0" + lsec2
-                msg[4] = " " + str(pmin) + ":" + str(psec2) + " of " + str(lmin) + ":" + str(lsec2)
+                if album_mode == 0:
+                    pmin = int(played/60)
+                    psec = int(played - (pmin * 60))
+                    psec2 = str(psec)
+                    if psec < 10:
+                        psec2 = "0" + psec2
+                    lmin = int(track_len/60)
+                    lsec = int(track_len - (lmin * 60))
+                    lsec2 = str(lsec)
+                    if lsec < 10:
+                        lsec2 = "0" + lsec2
+                    msg[4] = " " + str(pmin) + ":" + str(psec2) + "/" + str(lmin) + ":" + str(lsec2)
+                else:
+                    aplayed = (time.monotonic() - atime) + asofar
+                    pmin = int(aplayed/60)
+                    psec = int(aplayed - (pmin * 60))
+                    psec2 = str(psec)
+                    if psec < 10:
+                        psec2 = "0" + psec2
+                    lmin = int(atimer/60)
+                    lsec = int(atimer - (lmin * 60))
+                    lsec2 = str(lsec)
+                    if lsec < 10:
+                        lsec2 = "0" + lsec2
+                    msg[4] = str((Track_No - astrack) + 1) + "/" + str(ctracks) + "  " + str(pmin) + ":" + str(psec2) + "/" + str(lmin) + ":" + str(lsec2)
                 msg[7] = "VOL+/-       SLEEP/SD"
                 ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                 pfiles = glob.glob(ptrack + "*.jpg")
@@ -1587,6 +1533,7 @@ while True:
                 time.sleep(0.5)
                 timer2 = time.monotonic()
             elif buttonPLAY.is_pressed:
+				# STOP Play
                 Disp_on = 1
                 Disp_start = time.monotonic()
                 timer1 = time.monotonic()
@@ -1623,7 +1570,18 @@ while True:
                 while buttonNEXT.is_pressed:
                     if time.monotonic() - timer1 > 1:
                         if go == 1:
+							# NEXT Track
                             Track_No += 1
+                            if album_mode == 1:
+                                atime = time.monotonic()
+                                if Track_No - astrack > ctracks - 1:
+                                    Track_No -=1
+                                asofar = 0
+                                for q in range(0,Track_No - astrack):
+                                    asofar += itracks[q]
+                                aleft = 0
+                                for q in range((Track_No - astrack),ctracks):
+                                    aleft += itracks[q]
                             if Track_No > len(tracks) - 1:
                                 Track_No = Track_No - len(tracks)
                             msg[0] = "STOP/Radio  PRE/NXT"
@@ -1631,13 +1589,25 @@ while True:
                             msg[1] = titles[0][0:19]
                             msg[2] = titles[1][0:19]
                             msg[3] = titles[2][0:19]
+                            msg[4] = str((Track_No - astrack) + 1) + "/" + str(ctracks)
                             ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                             pfiles = glob.glob(ptrack + "*.jpg")
                             display_screen()
                             time.sleep(0.5)
                 if time.monotonic() - timer1 < 1:
                     if go == 1:
+						# PREVIOUS Track
                         Track_No -= 1
+                        if album_mode == 1:
+                            atime  = time.monotonic()
+                            if Track_No < astrack :
+                                Track_No +=1
+                            asofar = 0
+                            for q in range(0,Track_No - astrack):
+                                asofar += itracks[q]
+                            aleft = 0
+                            for q in range((Track_No - astrack),ctracks):
+                                aleft += itracks[q]
                         if Track_No < 0:
                             Track_No = len(tracks) + Track_No
                     msg[0] = "STOP/Radio  PRE/NXT"
@@ -1645,6 +1615,7 @@ while True:
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
+                    msg[4] = str((Track_No - astrack) + 1) + "/" + str(ctracks)
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                     pfiles = glob.glob(ptrack + "*.jpg")
                     display_screen()
@@ -1664,10 +1635,6 @@ while True:
                 time.sleep(0.5)
                 Set_Volume()
                 status()
-                if album_mode == 0:
-                    track_n = str(Track_No + 1) + "     "
-                else:
-                    track_n = "1/" + str(ctracks) + "       "
                 msg[0] = "STOP/Radio  PRE/NXT" 
                 display_screen()
                 Disp_start = time.monotonic()
@@ -1686,25 +1653,12 @@ while True:
             elif buttonSLEEP.is_pressed:
                 Disp_on = 1
                 timer1 = time.monotonic()
-                if (sleep_timer == 0 and album_mode == 0) or (album_mode ==1 and sleep_timer == stimer + 60):
+                if (sleep_timer == 0 and album_mode == 0) or (album_mode ==1 and sleep_timer == atimer + 60):
                     sleep_timer = 900
                 elif sleep_timer == 0 and shuffled == 0 and album_mode == 1:
                     # determine album length to set sleep time
-                    Tack_No = Track_No
-                    stimer  = 0
-                    stitles = [0,0,0,0,0,0,0]
-                    stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                    talbum = stitles[1]
-                    tartist = stitles[0]
-                    while stitles[1] == talbum and stitles[0] == tartist:
-                        stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
-                        strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
-                        audio = MP3(strack)
-                        stimer += audio.info.length
-                        Tack_No +=1
-                    audio = MP3(strack)
-                    stimer -= audio.info.length
-                    sleep_timer = stimer + 60
+                    album_length()
+                    sleep_timer = atimer + 60
                 else:
                     sleep_timer = (time_left * 60) + 960
                     if sleep_timer > 10800:
