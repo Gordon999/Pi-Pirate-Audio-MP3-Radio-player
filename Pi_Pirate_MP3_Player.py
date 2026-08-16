@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.25"
+version  = "1.26"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -1639,8 +1639,7 @@ while True:
                 display_screen()
                 Disp_start = time.monotonic()
                 timer2 = time.monotonic()
- 
-                           
+                          
             # check for SLEEP/SHUTDOWN key
             elif  buttonSLEEP.is_pressed and Disp_on == 0:
                 Disp_start = time.monotonic()
@@ -1656,9 +1655,11 @@ while True:
                 if (sleep_timer == 0 and album_mode == 0) or (album_mode ==1 and sleep_timer == atimer + 60):
                     sleep_timer = 900
                 elif sleep_timer == 0 and shuffled == 0 and album_mode == 1:
-                    # determine album length to set sleep time
-                    album_length()
-                    sleep_timer = atimer + 60
+					# determine time left of album
+                    aleft = 0
+                    for q in range((Track_No - astrack),ctracks):
+                        aleft += itracks[q]
+                    sleep_timer = aleft + 60
                 else:
                     sleep_timer = (time_left * 60) + 960
                     if sleep_timer > 10800:
