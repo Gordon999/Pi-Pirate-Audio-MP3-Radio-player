@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.27"
+version  = "1.28"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -45,11 +45,12 @@ volume       = 40  # range 0 - 100
 Track_No     = 0   # start track number
 
 # variables set once
+config_file  = "PirateConfig.txt"
 use_USB      = 1   # set to 0 if you ONLY use /home/<USERNAME>/Music/... on SD card
 usb_timer    = 6   # seconds to find USB present
-sleep_timer  = 0   # sleep_timer timer in minutes, use 15,30,45,60 etc...set to 0 to disable
+sleep_time   = 0   # sleep_time timer in minutes, use 15,30,45,60 etc...set to 0 to disable
 sleep_shutdn = 0   # set to 1 to shutdown Pi when sleep times out
-Disp_timer   = 60  # Display timeout in seconds, set to 0 to disable
+Disp_timer   = 120 # Display timeout in seconds, set to 0 to disable
 show_clock   = 1   # set to 1 to show clock, only use if on web or using RTC
 gaptime      = 2   # set pre-start time for gapless, in seconds
 screen       = 0   # for testing, 0 = ST7789, 1 = pygame screen
@@ -64,8 +65,8 @@ Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",0
 # GPIO BUTTONS GPIO BCM numbers (Physical pin numbers)
 PLAY  = 5  # (29) PLAY / STOP / HOLD for 3 seconds for RADIO 
 VOLUP = 6  # (31) Adjust volume UP whilst playing, set ALBUM MODE/RANDOM ON/OFF whilst stopped
-NEXT  = 16 # (36) HOLD for NEXT TRACK / STATION (whilst playing) / NEXT ALBUM (whilst stopped) - quick press for PREVIOUS 
-SLEEP = 24 # (18) Set SLEEP time, HOLD for 20 seconds to SHUTDOWN, set GAPLESS/SHUTDOWN whilst stopped.
+NEXT  = 16 # (36) HOLD for NEXT TRACK / STATION (whilst playing) / NEXT ALBUM (whilst stopped) - quick press for PREVIOUS ALBUM
+SLEEP = 24 # (18) Set SLEEP time, HOLD for 20 seconds to SHUTDOWN whilst playing, set GAPLESS/SHUTDOWN whilst stopped.
 
 if screen == 0: # st7789 screen
     import st7789
@@ -86,7 +87,6 @@ elif screen == 1: # for testing with pygame, and pirate buttons
     pygame.display.set_caption("MP3 / Radio Player" )
 
 # check config file exists, if not then write default values
-config_file = "PirateConfig.txt"
 if not os.path.exists(config_file) or os.stat(config_file).st_size == 0:
     headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
     defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
@@ -167,14 +167,13 @@ old_album   = 0
 old_artist  = 0
 titles      = [0,0,0,0,0,0,0]
 itles       = [0,0,0,0,0,0,0]
-sleep_timer = sleep_timer * 60
+sleep_time  = sleep_time * 60
 freedisk    = ["0","0","0","0"]
 old_secs    = "00"
 old_secs2   = "00"
 Disp_on     = 1
-album       = 0
-atimer      = 0
-ctracks     = 0
+alength     = 0
+atracks     = 0
 stopped     = 0
 synced      = 0
 reloading   = 0
@@ -182,12 +181,13 @@ msg         = [""] * 8
 msg[0]      = "MP3 Player: v" + version
 abort_sd    = 1
 usb_found   = 0
-relno       = 0
 stop        = 0
 pfiles      = []
 ptrack      = ""
 showit      = 1
 asofar      = 0
+astrack     = 0
+aitracks    = [0] * 70
 
 # find username
 h_user  = []
@@ -294,7 +294,7 @@ display_screen()
 time.sleep(1)
 
 def reload():
-  global tracks,x,top,msg,Track_No,stop,relno
+  global tracks,x,top,msg,Track_No,stop
   if stop == 0:
     tracks  = []
     msg[0] = "Tracks: " + str(len(tracks))
@@ -314,12 +314,13 @@ def reload():
         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = usb_tracks[xx].split("/")
         track = titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/" + titles[2] + "/" + titles[3]
         tracks.append(track)
+    msg[0] = "Tracks: " + str(len(tracks))
+    display_screen()
     if len(tracks) > 0:
         tracks.sort()
     with open('tracks.txt', 'w') as f:
         for item in tracks:
             f.write("%s\n" % item)
-    msg[0] = ("Tracks: " + str(len(tracks)))
     Track_No = 0
     save_config()
     if len(tracks) == 0:
@@ -359,7 +360,7 @@ def Set_Volume():
                 os.system("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + str(volume/100))
             time.sleep(0.5)
     if time.monotonic() - timer1 < 1:
-        volume += 10
+        volume += 5
         time.sleep(0.5)
     if len(alsaaudio.mixers()) > 0 and lver < 13:
         m.setvolume(volume)
@@ -375,7 +376,7 @@ def Set_Volume():
     save_config()
 
 def status():
-    global txt,shuffled,gapless,album_mode,sleep_timer
+    global txt,shuffled,gapless,album_mode,sleep_time
     txt = " "
     if shuffled == 1:
         txt +="R"
@@ -389,7 +390,7 @@ def status():
         txt +="A"
     else:
         txt +=" "
-    if sleep_timer > 0:
+    if sleep_time > 0:
         txt +="S"
     else:
         txt +=" "
@@ -430,7 +431,6 @@ if line != str(total_size):
     with open("freeSD.txt", "w") as f:
         f.write(str(total_size))
     reloading = 1
-    relno     = 1
 
 # load MP3 tracks
 tracks  = []
@@ -475,7 +475,6 @@ if use_USB == 1:
                     for item in free:
                         f.write("%s\n" % item)
                 reloading = 1
-                relno +=2
     else:
         freedisk = ["0","0","0","0"]
         with open("freedisk.txt", "w") as f:
@@ -541,24 +540,24 @@ if len(tracks) > 0:
         reload()
 
 def album_length():
-	# determine album length and number of tracks
-    global tracks,Track_No,ctracks,atimer,astrack,itracks
-    itracks = [0] * 70 
+	# determine album timings and number of tracks
+    global tracks,Track_No,atracks,alength,astrack,aitracks
     # find first track of Album
     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
     new_artist = titles[0]
     new_album  = titles[1]
     tracks.sort()
-    Track_No = 0
+    Track_No -= 100
+    Track_No = max(Track_No,0)
     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
     while new_artist != titles[0] or new_album != titles[1]:
         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
         Track_No +=1
     Track_No -=1
-    astrack = Track_No
+    astrack = Track_No # first track of an album
     # find number of Album tracks and album timings
     Tack_No = Track_No 
-    atimer  = 0
+    alength  = 0
     stitles = [0,0,0,0,0,0,0]
     stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
     talbum = stitles[1]
@@ -568,13 +567,13 @@ def album_length():
         stitles[0],stitles[1],stitles[2],stitles[3],stitles[4],stitles[5],stitles[6] = tracks[Tack_No].split("/")
         strack = stitles[3] + "/" + stitles[4] + "/" + stitles[5] + "/" + stitles[6] + "/" + stitles[0] + "/" + stitles[1] + "/" + stitles[2]
         audio = MP3(strack)
-        atimer += audio.info.length
-        itracks[itr] = audio.info.length
+        alength += audio.info.length
+        aitracks[itr] = audio.info.length # stores individual track lengths of an album
         Tack_No +=1
         itr +=1
     audio = MP3(strack)
-    atimer -= audio.info.length
-    ctracks = Tack_No - Track_No - 1
+    alength -= audio.info.length     # full album length
+    atracks = Tack_No - Track_No - 1 # number of album tracks
     
 if album_mode == 1 and len(tracks) > 0:
     shuffled = 0
@@ -596,12 +595,10 @@ elif shuffled == 0 and gapless != 0:
 if len(tracks) > 0:
     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
 
-sleep_timer_start = time.monotonic()
-Disp_start        = time.monotonic()
-timer2            = time.monotonic()
-sync_timer        = time.monotonic()
-xt                = 0
-atime             = time.monotonic()
+sleep_timer = time.monotonic()
+Disp_timer  = time.monotonic()
+sync_timer  = time.monotonic()
+Album_timer = time.monotonic()
 
 # check if clock synchronised
 msg[0] = "Checking clock..."
@@ -610,9 +607,7 @@ msg[2] = ""
 display_screen()
 if os.path.exists ("/run/shm/sync.txt"):
     os.remove("/run/shm/sync.txt")
-display_screen()
 os.system("timedatectl >> /run/shm/sync.txt")
-display_screen()
 # read sync.txt file
 try:
     sync = []
@@ -668,15 +663,15 @@ while True:
             msg[2] = titles[1][0:19] # Album
             msg[3] = titles[2][0:19] # Track
             if album_mode == 1:
-                msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
+                msg[4] = "1 of " + str(atracks) + " : " + str(int(alength/60)) + "mins"
             # find album cover image
             ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
             pfiles = glob.glob(ptrack + "*.jpg")
             status()
           msg[5] = "Status...  "  +  txt
           msg[7] = "ALB/RNDM    GAP/SD"
-          if sleep_timer != 0:
-              time_left = int((sleep_timer - (time.monotonic() - sleep_timer_start))/60)
+          if sleep_time != 0:
+              time_left = int((sleep_time - (time.monotonic() - sleep_timer))/60)
               if sleep_shutdn == 1:
                   msg[6] = "Shutdown: " + str(time_left) + "mins"
               else:
@@ -693,14 +688,14 @@ while True:
                 t += " "
             clock = t + clock
             if secs != old_secs2 :
-              vp = random.randint(0,7)
-              msg = [""] * 8
-              msg[vp] = clock
-              display_screen()
-              old_secs2 = secs
+                vp = random.randint(0,7)
+                msg = [""] * 8
+                msg[vp] = clock
+                display_screen()
+                old_secs2 = secs
 
         # DISPLAY OFF timer
-        if time.monotonic() - Disp_start > Disp_timer and Disp_timer > 0 and Disp_on == 1:
+        if time.monotonic() - Disp_timer > Disp_timer and Disp_timer > 0 and Disp_on == 1:
             msg = [""] * 8
             Disp_on = 0
             showit = 0
@@ -708,9 +703,9 @@ while True:
                 disp.set_backlight(0)
             display_screen()
             
-        # check sleep_timer
-        if time.monotonic() - sleep_timer_start > sleep_timer and sleep_timer > 0:
-            Disp_start = time.monotonic()
+        # check sleep_time
+        if time.monotonic() - sleep_timer > sleep_time and sleep_time > 0:
+            Disp_timer = time.monotonic()
             abort_sd = 0
             t = 30
             while t > 0 and abort_sd == 0:
@@ -722,8 +717,8 @@ while True:
                 display_screen()
                 if buttonSLEEP.is_pressed or buttonPLAY.is_pressed:
 					# abort stop / shutdown if button pressed
-                    sleep_timer_start = time.monotonic()
-                    sleep_timer = 900
+                    sleep_timer = time.monotonic()
+                    sleep_time = 900
                     abort_sd = 1
                 t -=1
                 time.sleep(1)
@@ -738,51 +733,50 @@ while True:
                 time.sleep(3)
                 msg[0] = ""
                 display_screen()
-                sleep_timer = 0 
+                sleep_time = 0 
                 if sleep_shutdn == 1:
-                    os.system("sudo shutdown -h now")
+                    os.system("shutdown -h now")
             else:
 				# aborted stop / shutdown
                 status()
                 msg[0] = "PLAY/Radio  PRE/NXT"
                 display_screen()
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             
         # check for PLAY/STOP/RADIO key
         if buttonPLAY.is_pressed and Disp_on == 0:
             Disp_on = 1
             showit  = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
             msg[0] = "PLAY/Radio  PRE/NXT"
             display_screen()
             time.sleep(0.5)
-            timer2 = time.monotonic()
         elif buttonPLAY.is_pressed:
             stopped = 0
             Disp_on = 1
             showit  = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             timer1 = time.monotonic()
             msg = [""] * 8
             msg[0] = "PLAY/Radio  PRE/NXT"
             msg[1] = "HOLD 3s for RADIO"
             display_screen()
             time.sleep(0.5)
-            sleep_timer = 0
+            sleep_time = 0
             while buttonPLAY.is_pressed and time.monotonic() - timer1 < 3:
                 pass
             if time.monotonic() - timer1 < 3 and len(tracks) > 0:
 				# PLAY MP3
                 if album_mode == 1:
-                    atime  = time.monotonic()
+                    Album_timer = time.monotonic()
                     asofar = 0
 					# determine album length and number of tracks
                     album_length()
                 MP3_Play = 1
                 radio    = 0
-                time.sleep(2)
+                time.sleep(0.5)
                 save_config()
             else:
 				# PLAY RADIO
@@ -793,6 +787,7 @@ while True:
                 time.sleep(0.05)
                 msg[0] = (Radio_Stns[radio_stn])
                 display_screen()
+                timer1 = time.monotonic()
                 while buttonPLAY.is_pressed:
                     pass
                 radio    = 1
@@ -803,11 +798,11 @@ while True:
         if buttonNEXT.is_pressed and Disp_on == 0:
             Disp_on = 1
             showit  = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg[0] = "PLAY/Radio  PRE/NXT"
+            display_screen()
             time.sleep(0.5)
-            timer2 = time.monotonic()
         elif buttonNEXT.is_pressed and len(tracks) > 1:
             Disp_on = 1
             showit  = 1
@@ -843,11 +838,8 @@ while True:
                 msg[2] = titles[1][0:19]
                 msg[3] = titles[2][0:19]
                 if album_mode == 1:
-                    msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
+                    msg[4] = "1 of " + str(atracks) + " : " + str(int(alength/60)) + "mins"
                 display_screen()
-                time.sleep(0.05)
-                timer3 = time.monotonic()
-                album = 1
                 time.sleep(0.5)
             if time.monotonic() - timer1 > 1:
                 # NEXT ALBUM
@@ -866,7 +858,7 @@ while True:
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
                     if album_mode == 1:
-                        msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
+                        msg[4] = "1 of " + str(atracks) + " : " + str(int(alength/60)) + "mins"
                     msg[7] = "NEXT A-Z     ARTIST" 
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
@@ -886,7 +878,7 @@ while True:
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
                     if album_mode == 1:
-                        msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
+                        msg[4] = "1 of " + str(atracks) + " : " + str(int(alength/60)) + "mins"
                     msg[7] = "NEXT A-Z     ARTIST"
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
@@ -906,30 +898,28 @@ while True:
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
                     if album_mode == 1:
-                        msg[4] = "1 of " + str(ctracks) + " : " + str(int(atimer/60)) + "mins"
+                        msg[4] = "1 of " + str(atracks) + " : " + str(int(alength/60)) + "mins"
                     msg[7] = "NEXT A-Z     ARTIST"
                     pfiles = []
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                     pfiles = glob.glob(ptrack + "*.jpg")
                     display_screen()
                     time.sleep(0.5)
-            timer3 = time.monotonic()
-            album = 1
                         
         # check for GAPLESS/SHUTDOWN (SLEEP)  key
         if buttonSLEEP.is_pressed and Disp_on == 0:
             Disp_on = 1
             showit  = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg[0] = "PLAY/Radio  PRE/NXT"
+            display_screen()
             time.sleep(0.5)
-            timer2 = time.monotonic()
         elif buttonSLEEP.is_pressed:
             time.sleep(0.5)
             showit = 1
             timer1 = time.monotonic()
-            timer = time.monotonic()
+            timer = time.monotonic()	
             if gapless == 0:
 				# switch ON GAPLESS
                 gap = gaptime
@@ -953,9 +943,9 @@ while True:
             display_screen()
             save_config()
             time.sleep(0.5)
-            timer2 = time.monotonic()
-            xt = 2
             while buttonSLEEP.is_pressed:
+                if buttonVOLUP.is_pressed:
+                    reload()
                 if time.monotonic() - timer1 > 10:
                     msg[1] = "SHUTDOWN in " + str(20-int(time.monotonic() - timer1))
                     display_screen()
@@ -971,20 +961,18 @@ while True:
                     MP3_Play = 0
                     radio = 0
                     time.sleep(1)
-                    os.system("sudo shutdown -h now")
-            Disp_start = time.monotonic()
-            timer2 = time.monotonic()
-            xt = 2
+                    os.system("shutdown -h now")
+            Disp_timer = time.monotonic()
            
         # check for ALBUM MODE/RANDOM (VOLUP) key
         if  buttonVOLUP.is_pressed and Disp_on == 0:
             Disp_on = 1
             showit  = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg[0] = "PLAY/Radio  PRE/NXT"
+            display_screen()
             time.sleep(0.5)
-            timer2 = time.monotonic()
         elif buttonVOLUP.is_pressed:
             showit = 1
             timer1 = time.monotonic()
@@ -1037,15 +1025,11 @@ while True:
                 display_screen()
                 save_config()
                 time.sleep(1)
-                timer2 = time.monotonic()
-                xt = 2
             status()
             msg[0] = "PLAY/Radio  PRE/NXT"
             ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
             pfiles = glob.glob(ptrack + "*.jpg")
             display_screen()
-            timer2 = time.monotonic()
-            xt = 2
             
     # loop while playing Radio
     while radio == 1:
@@ -1069,30 +1053,30 @@ while True:
                     synced = 0
             except:
                 pass
+                
         # DISPLAY OFF timer
-        if time.monotonic() - Disp_start > Disp_timer and Disp_timer > 0 and Disp_on == 1:
+        if time.monotonic() - Disp_timer > Disp_timer and Disp_timer > 0 and Disp_on == 1:
             msg = [""] * 8
             Disp_on = 0
             if show_clock == 0 and screen == 0:
                 disp.set_backlight(0)
             display_screen()
             
-        # sleep_timer timer
-        if time.monotonic() - sleep_timer_start > sleep_timer and sleep_timer > 0:
-            Disp_start = time.monotonic()
+        # sleep_time timeout
+        if time.monotonic() - sleep_timer > sleep_time and sleep_time > 0:
+            Disp_timer = time.monotonic()
             abort_sd = 0
             t = 30
             Disp_on = 1
             while t > 0 and abort_sd == 0:
                 if sleep_shutdn == 1:
                     msg[1] = "SHUTDOWN in " + str(t)
-                    display_screen()
                 else:
                     msg[1] = "STOPPING in " + str(t)
-                    display_screen()
+                display_screen()
                 if buttonSLEEP.is_pressed:
-                    sleep_timer_start = time.monotonic()
-                    sleep_timer = 900
+                    sleep_timer = time.monotonic()
+                    sleep_time = 900
                     abort_sd = 1
                 t -=1
                 time.sleep(1)
@@ -1100,7 +1084,6 @@ while True:
                 msg = [""] * 8
                 if sleep_shutdn == 1:
                     msg[0] = "SHUTTING DOWN..."
-                    display_screen()
                 else:
                     msg[0] = "STOPPING........"
                 display_screen()
@@ -1111,28 +1094,27 @@ while True:
                 display_screen()
                 q.kill()
                 if sleep_shutdn == 1:
-                    os.system("sudo shutdown -h now")
-                sleep_timer = 0
+                    os.system("shutdown -h now")
+                sleep_time = 0
                 stopped = 1
                 radio = 0
                 time.sleep(1)
-            Disp_start = time.monotonic()
-
+            Disp_timer = time.monotonic()
             
-        # display sleep_timer time left and clock (if enabled and synced)
+        # display sleep_time time left and clock (if enabled and synced)
         now = datetime.datetime.now()
         clock = now.strftime("%H:%M:%S")
-        secs = now.strftime("%S")
-        time_left = int((sleep_timer - (time.monotonic() - sleep_timer_start))/60)
+        secs  = now.strftime("%S")
+        time_left = int((sleep_time - (time.monotonic() - sleep_timer))/60)
         if Radio_Stns[radio_stn + 2] == 0:
             msg[1] = (Radio_Stns[radio_stn])
         else:
             msg[1] = ""
-        if sleep_timer > 0:
+        if sleep_time > 0:
             if sleep_shutdn == 1:
-                msg[3] = "Shutdown: " + str(time_left) + "mins"
+                msg[6] = "Shutdown: " + str(time_left) + "mins"
             else:
-                msg[3] = "Stopping: " + str(time_left) + "mins"
+                msg[6] = "Stopping: " + str(time_left) + "mins"
         if show_clock == 1 and synced == 1:
             msg[2] = "        " + clock
         t = ""
@@ -1145,7 +1127,7 @@ while True:
             display_screen()
         if show_clock == 1 and Disp_on == 0 and synced == 1 and stopped == 0:
             if secs != old_secs:
-                if sleep_timer > 0:
+                if sleep_time > 0:
                     clock = clock + " " + str(time_left)
                 vp = random.randint(0,7)
                 msg = [""] * 8
@@ -1156,14 +1138,13 @@ while True:
         # check for VOLUME UP/DOWN  key
         if buttonVOLUP.is_pressed and Disp_on == 0:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
             msg[0] = "STOP            PRE/NXT"
             msg[7] = "VOL+/-        SLEEP/SD"
             time.sleep(0.5)
             display_screen()
-            timer2 = time.monotonic()
         elif buttonVOLUP.is_pressed:
             Set_Volume()
             status()
@@ -1172,23 +1153,20 @@ while True:
             msg[0] = "STOP           PRE/NXT"
             msg[7] = "VOL+/-       SLEEP/SD"
             display_screen()
-            Disp_start = time.monotonic()
-            timer2 = time.monotonic()
-                
-           
+            Disp_timer = time.monotonic()
+          
         # check NEXT/PREVIOUS key
         if buttonNEXT.is_pressed and Disp_on == 0:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
             msg[0] = "STOP       PRE/NEXT"
             display_screen()
             time.sleep(0.5)
-            timer2 = time.monotonic()
         elif buttonNEXT.is_pressed:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             timer1 = time.monotonic()
             while buttonNEXT.is_pressed and time.monotonic() - timer1 < 1:
                 pass
@@ -1228,22 +1206,19 @@ while True:
             q = subprocess.Popen(["cvlc",Radio_Stns[radio_stn + 1]] ,shell=False)
             time.sleep(1)
             save_config()
-            timer2 = time.monotonic()
-            time.sleep(1)
-
           
         # check PLAY/STOP/Radio key
         if buttonPLAY.is_pressed and Disp_on == 0:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
             msg[0] = "STOP       PRE/NEXT"
+            display_screen()
             time.sleep(0.5)
-            timer2 = time.monotonic()
         elif buttonPLAY.is_pressed:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             q.kill()
             radio = 0
             msg = [""] * 8
@@ -1255,39 +1230,37 @@ while True:
             display_screen()
             save_config()
             time.sleep(2)
-            
-
-        # check for sleep_timer key
+ 
+        # check for sleep_time key
         if buttonSLEEP.is_pressed and Disp_on == 0:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
             msg[0] = "STOP       PRE/NEXT"
             display_screen()
             time.sleep(0.5)
-            timer2 = time.monotonic()
         
         elif buttonSLEEP.is_pressed:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             timer1 = time.monotonic()
-            sleep_timer_start = time.monotonic()
+            sleep_timer = time.monotonic()
             msg = [""] * 8
-            if sleep_timer > 0:
-                msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+            if sleep_time > 0:
+                msg[0] = "Set SLEEP.. " + str(int(sleep_time/60))
             else:
                 msg[0] = "Set SLEEP.. OFF"
             msg[1] = "HOLD for 20 to SHUTDOWN "
             display_screen()
             while buttonSLEEP.is_pressed:
-                sleep_timer +=900
-                if sleep_timer > 7200:
-                     sleep_timer = 0
-                sleep_timer_start = time.monotonic()
+                sleep_time +=900
+                if sleep_time > 7200:
+                     sleep_time = 0
+                sleep_timer = time.monotonic()
                 msg = [""] * 8
-                if sleep_timer > 0:
-                    msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                if sleep_time > 0:
+                    msg[0] = "Set SLEEP.. " + str(int(sleep_time/60))
                 else:
                     msg[0] = "Set SLEEP.. OFF"
                 display_screen()
@@ -1306,14 +1279,12 @@ while True:
                     MP3_Play = 0
                     radio = 0
                     time.sleep(1)
-                    os.system("sudo shutdown -h now")
-            Disp_start = time.monotonic()
+                    os.system("shutdown -h now")
+            Disp_timer = time.monotonic()
             time.sleep(0.5)
             msg[0] = Radio_Stns[radio_stn]
             msg[1] = ""
             display_screen()
-            timer2 = time.monotonic()
-            xt = 2
                     
     # loop while playing MP3 tracks
     while MP3_Play == 1 :
@@ -1339,19 +1310,20 @@ while True:
                 pass
                 
         # stop playing if end of album, in album mode
-        if Track_No > (astrack + ctracks) - 1 and album_mode == 1:
-            status()
-            msg[0] = "PLAY/Radio  PRE/NXT"
-            msg[1] = titles[0][0:19]
-            msg[2] = titles[1][0:19]
-            msg[3] = titles[2][0:19]
-            display_screen()
-            MP3_Play = 0
+        if album_mode == 1:
+            if Track_No > (astrack + atracks) - 1:
+                status()
+                msg[0] = "PLAY/Radio  PRE/NXT"
+                msg[1] = titles[0][0:19]
+                msg[2] = titles[1][0:19]
+                msg[3] = titles[2][0:19]
+                display_screen()
+                MP3_Play = 0
             
-        # sleep_timer timer
-        if time.monotonic() - sleep_timer_start > sleep_timer and sleep_timer > 0:
+        # sleep_time timer
+        if time.monotonic() - sleep_timer > sleep_time and sleep_time > 0:
             Disp_on = 1
-            Disp_start = time.monotonic()
+            Disp_timer = time.monotonic()
             abort_sd = 0
             t = 30
             while t > 0 and abort_sd == 0:
@@ -1363,8 +1335,8 @@ while True:
                     msg[1] = "STOPPING in " + str(t)
                     display_screen()
                 if buttonSLEEP.is_pressed:
-                    sleep_timer_start = time.monotonic()
-                    sleep_timer = 900
+                    sleep_timer = time.monotonic()
+                    sleep_time = 900
                     abort_sd = 1
                 t -=1
                 time.sleep(1)
@@ -1384,15 +1356,15 @@ while True:
                 if poll == None:
                     os.killpg(p.pid, SIGTERM)
                 if sleep_shutdn == 1:
-                    os.system("sudo shutdown -h now")
-                sleep_timer = 0
+                    os.system("shutdown -h now")
+                sleep_time = 0
                 stopped = 1
                 MP3_Play = 0
             else:
                 status()
                 display_screen()
                 time.sleep(0.05)
-                Disp_start = time.monotonic()
+                Disp_timer = time.monotonic()
             poll = p.poll()
             if poll == None:
                 os.killpg(p.pid, SIGTERM)
@@ -1432,15 +1404,13 @@ while True:
           poll = p.poll()
           while poll != None:
             poll = p.poll()
-          timer2 = time.monotonic()
           timer1 = time.monotonic()
-          xt = 0
           go = 1
           played = time.monotonic() - timer1
           
           # loop while playing selected MP3 track
-          while poll == None and track_len - played > gap and (time.monotonic() - sleep_timer_start < sleep_timer or sleep_timer == 0):
-            time_left = int((sleep_timer - (time.monotonic() - sleep_timer_start))/60)
+          while poll == None and track_len - played > gap and (time.monotonic() - sleep_timer < sleep_time or sleep_time == 0):
+            time_left = int((sleep_time - (time.monotonic() - sleep_timer))/60)
                 
             # display clock whilst timed out (if enabled and synced)
             if show_clock == 1 and Disp_on == 0 and synced == 1:
@@ -1451,8 +1421,8 @@ while True:
                 for r in range (0,random.randint(0,10)):
                     t += " "
                 clock = t + clock
-                time_left = int((sleep_timer - (time.monotonic() - sleep_timer_start))/60)
-                if sleep_timer > 0:
+                time_left = int((sleep_time - (time.monotonic() - sleep_timer))/60)
+                if sleep_time > 0:
                     clock += " " + str(time_left)
                 if secs != old_secs2 :
                   vp = random.randint(0,7)
@@ -1465,7 +1435,7 @@ while True:
             played  = time.monotonic() - timer1
 
             # DISPLAY OFF timer
-            if time.monotonic() - Disp_start > Disp_timer and Disp_timer > 0 and Disp_on == 1:
+            if time.monotonic() - Disp_timer > Disp_timer and Disp_timer > 0 and Disp_on == 1:
                 msg = [""] * 8
                 Disp_on = 0
                 if show_clock == 0 and screen == 0:
@@ -1481,8 +1451,8 @@ while True:
                 status()
                 msg[5] = "Status...  " +  txt
                 msg[6] = ""
-                if sleep_timer != 0:
-                    time_left = int((sleep_timer - (time.monotonic() - sleep_timer_start))/60)
+                if sleep_time != 0:
+                    time_left = int((sleep_time - (time.monotonic() - sleep_timer))/60)
                     if sleep_shutdn == 1:
                         msg[6] = "Shutdown: " + str(time_left) + "mins"
                     else:
@@ -1506,18 +1476,18 @@ while True:
                         lsec2 = "0" + lsec2
                     msg[4] = " " + str(pmin) + ":" + str(psec2) + "/" + str(lmin) + ":" + str(lsec2)
                 else:
-                    aplayed = (time.monotonic() - atime) + asofar
+                    aplayed = (time.monotonic() - Album_timer) + asofar
                     pmin = int(aplayed/60)
                     psec = int(aplayed - (pmin * 60))
                     psec2 = str(psec)
                     if psec < 10:
                         psec2 = "0" + psec2
-                    lmin = int(atimer/60)
-                    lsec = int(atimer - (lmin * 60))
+                    lmin = int(alength/60)
+                    lsec = int(alength - (lmin * 60))
                     lsec2 = str(lsec)
                     if lsec < 10:
                         lsec2 = "0" + lsec2
-                    msg[4] = str((Track_No - astrack) + 1) + "/" + str(ctracks) + "  " + str(pmin) + ":" + str(psec2) + "/" + str(lmin) + ":" + str(lsec2)
+                    msg[4] = str((Track_No - astrack) + 1) + "/" + str(atracks) + "  " + str(pmin) + ":" + str(psec2) + "/" + str(lmin) + ":" + str(lsec2)
                 msg[7] = "VOL+/-       SLEEP/SD"
                 ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                 pfiles = glob.glob(ptrack + "*.jpg")
@@ -1526,16 +1496,16 @@ while True:
             # check for PLAY/STOP/RADIO key
             if buttonPLAY.is_pressed and Disp_on == 0:
                 Disp_on = 1
-                Disp_start = time.monotonic()
+                Disp_timer = time.monotonic()
                 status()
                 msg[0] = "STOP/Radio  PRE/NXT"
                 display_screen()
                 time.sleep(0.5)
-                timer2 = time.monotonic()
+
             elif buttonPLAY.is_pressed:
 				# STOP Play
                 Disp_on = 1
-                Disp_start = time.monotonic()
+                Disp_timer = time.monotonic()
                 timer1 = time.monotonic()
                 os.killpg(p.pid, SIGTERM)
                 msg[0] = "Track Stopped"
@@ -1549,20 +1519,18 @@ while True:
                 go = 0
                 MP3_Play = 0
                 save_config()
-                timer2 = time.monotonic()
                 
             # check for NEXT/PREVIOUS TRACK key
             elif buttonNEXT.is_pressed and Disp_on == 0:
                 Disp_on = 1
-                Disp_start = time.monotonic()
+                Disp_timer = time.monotonic()
                 status()
                 msg[0] = "STOP/Radio  PRE/NXT"
                 display_screen()
                 time.sleep(0.5)
-                timer2 = time.monotonic()
             elif buttonNEXT.is_pressed:
                 Disp_on = 1
-                Disp_start = time.monotonic()
+                Disp_timer = time.monotonic()
                 os.killpg(p.pid, SIGTERM)
                 timer1 = time.monotonic()
                 while buttonNEXT.is_pressed and time.monotonic() - timer1 < 1:
@@ -1573,18 +1541,18 @@ while True:
 							# NEXT Track
                             Track_No += 1
                             if album_mode == 1:
-                                atime = time.monotonic()
-                                if Track_No - astrack > ctracks - 1:
+                                Album_timer = time.monotonic()
+                                if Track_No - astrack > atracks - 1:
                                     Track_No -=1
                                 asofar = 0
                                 for q in range(0,Track_No - astrack):
-                                    asofar += itracks[q]
+                                    asofar += aitracks[q]
                                 # determine time left of album
                                 aleft = 0
-                                for q in range((Track_No - astrack),ctracks):
-                                    aleft += itracks[q]
-                                if sleep_timer > 0:
-                                     sleep_timer = aleft + 60
+                                for q in range((Track_No - astrack),atracks):
+                                    aleft += aitracks[q]
+                                if sleep_time > 0:
+                                    sleep_time = aleft + 60
                             if Track_No > len(tracks) - 1:
                                 Track_No = Track_No - len(tracks)
                             msg[0] = "STOP/Radio  PRE/NXT"
@@ -1592,7 +1560,7 @@ while True:
                             msg[1] = titles[0][0:19]
                             msg[2] = titles[1][0:19]
                             msg[3] = titles[2][0:19]
-                            msg[4] = str((Track_No - astrack) + 1) + "/" + str(ctracks)
+                            msg[4] = str((Track_No - astrack) + 1) + "/" + str(atracks)
                             ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                             pfiles = glob.glob(ptrack + "*.jpg")
                             display_screen()
@@ -1602,18 +1570,18 @@ while True:
 						# PREVIOUS Track
                         Track_No -= 1
                         if album_mode == 1:
-                            atime  = time.monotonic()
+                            Album_timer  = time.monotonic()
                             if Track_No < astrack :
                                 Track_No +=1
                             asofar = 0
                             for q in range(0,Track_No - astrack):
-                                asofar += itracks[q]
+                                asofar += aitracks[q]
                             # determine time left of album
                             aleft = 0
-                            for q in range((Track_No - astrack),ctracks):
-                                aleft += itracks[q]
-                            if sleep_timer > 0:
-                                sleep_timer = aleft + 60
+                            for q in range((Track_No - astrack),atracks):
+                                aleft += aitracks[q]
+                            if sleep_time > 0:
+                                sleep_time = aleft + 60
                         if Track_No < 0:
                             Track_No = len(tracks) + Track_No
                     msg[0] = "STOP/Radio  PRE/NXT"
@@ -1621,59 +1589,55 @@ while True:
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     msg[3] = titles[2][0:19]
-                    msg[4] = str((Track_No - astrack) + 1) + "/" + str(ctracks)
+                    msg[4] = str((Track_No - astrack) + 1) + "/" + str(atracks)
                     ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                     pfiles = glob.glob(ptrack + "*.jpg")
                     display_screen()
-                timer2 = time.monotonic()
                 go = 0
 
             # check for VOLUME UP/DOWN  key
             elif buttonVOLUP.is_pressed and Disp_on == 0:
                 Disp_on = 1
-                Disp_start = time.monotonic()
+                Disp_timer = time.monotonic()
                 status()
                 msg[0] = "STOP/Radio  PRE/NXT"
                 display_screen()
                 time.sleep(0.5)
-                timer2 = time.monotonic()
             elif buttonVOLUP.is_pressed:
                 time.sleep(0.5)
                 Set_Volume()
                 status()
                 msg[0] = "STOP/Radio  PRE/NXT" 
                 display_screen()
-                Disp_start = time.monotonic()
-                timer2 = time.monotonic()
-                          
+                Disp_timer = time.monotonic()
+                         
             # check for SLEEP/SHUTDOWN key
             elif  buttonSLEEP.is_pressed and Disp_on == 0:
-                Disp_start = time.monotonic()
+                Disp_timer = time.monotonic()
                 Disp_on = 1
                 status()
                 msg[0] = "STOP/Radio  PRE/NXT"
                 display_screen()
                 time.sleep(1)
-                timer2 = time.monotonic()
             elif buttonSLEEP.is_pressed:
                 Disp_on = 1
                 timer1 = time.monotonic()
-                if (sleep_timer == 0 and album_mode == 0) or (album_mode ==1 and sleep_timer == atimer + 60):
-                    sleep_timer = 900
-                elif sleep_timer == 0 and shuffled == 0 and album_mode == 1:
+                if (sleep_time == 0 and album_mode == 0) or (album_mode ==1 and sleep_time == alength + 60):
+                    sleep_time = 900
+                elif sleep_time == 0 and shuffled == 0 and album_mode == 1:
 					# determine time left of album
                     aleft = 0
-                    for q in range((Track_No - astrack),ctracks):
-                        aleft += itracks[q]
-                    sleep_timer = aleft + 60
+                    for q in range((Track_No - astrack),atracks):
+                        aleft += aitracks[q]
+                    sleep_time = aleft + 60
                 else:
-                    sleep_timer = (time_left * 60) + 960
-                    if sleep_timer > 10800:
-                        sleep_timer = 0
-                sleep_timer_start = time.monotonic()
+                    sleep_time = (time_left * 60) + 960
+                    if sleep_time > 10800:
+                        sleep_time = 0
+                sleep_timer = time.monotonic()
                 msg = [""] * 8
-                if sleep_timer > 0:
-                    msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                if sleep_time > 0:
+                    msg[0] = "Set SLEEP.. " + str(int(sleep_time/60))
                 else:
                     msg[0] = "Set SLEEP.. OFF"
                 msg[1] = "HOLD for 20 to SHUTDOWN "
@@ -1681,12 +1645,12 @@ while True:
                 time.sleep(1)
                 while buttonSLEEP.is_pressed:
                     if album_mode == 0:
-                        sleep_timer +=900
-                        if sleep_timer > 7200:
-                            sleep_timer = 0
-                        sleep_timer_start = time.monotonic()
-                        if sleep_timer > 0:
-                            msg[0] = "Set SLEEP.. " + str(int(sleep_timer/60))
+                        sleep_time +=900
+                        if sleep_time > 7200:
+                            sleep_time = 0
+                        sleep_timer = time.monotonic()
+                        if sleep_time > 0:
+                            msg[0] = "Set SLEEP.. " + str(int(sleep_time/60))
                         else:
                             msg[0] = "Set SLEEP.. OFF"
                         display_screen()
@@ -1705,14 +1669,12 @@ while True:
                         MP3_Play = 0
                         radio = 0
                         time.sleep(1)
-                        os.system("sudo shutdown -h now")
-                Disp_start = time.monotonic()
-                timer2 = time.monotonic()
-                xt = 2
+                        os.system("shutdown -h now")
+                Disp_timer = time.monotonic()
                 
             poll = p.poll()
           if go == 1:
-               Track_No +=1
+              Track_No +=1
           if Track_No < 0:
               Track_No = len(tracks) + Track_No
           elif Track_No > len(tracks) - 1:
