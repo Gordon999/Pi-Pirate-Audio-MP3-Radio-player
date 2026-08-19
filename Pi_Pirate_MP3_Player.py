@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.32"
+version  = "1.33"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -56,6 +56,7 @@ gaptime      = 2   # set pre-start time for gapless, in seconds
 screen       = 0   # for testing, 0 = ST7789, 1 = pygame screen
 banners      = 0   # set to 1 to add black backgrounds on rows 1 and 8
 
+#RADIO STATIONS, "Name","URL","0 or 1" - 1 means don't show name if you have a logo image.
 Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",1,
               "Radio Paradise Main","http://stream.radioparadise.com/mp3-320",0,
               "Radio Paradise Mellow","http://stream.radioparadise.com/mellow-192",0,
@@ -188,6 +189,7 @@ asofar      = 0
 astrack     = 0
 aitracks    = [0] * 70
 scroll      = 0
+old_volume  = volume
 
 # find username
 h_user  = []
@@ -334,9 +336,10 @@ def save_config():
     global MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No,config_file
     headers  = ['MP3_Play  ','radio     ','radio_stn ','shuffled  ','album_mode','volume    ','gapless   ','Track_No  ']
     defaults = [MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,Track_No]
-    with open(config_file, 'w') as f:
-        for item in range(0,len(headers)):
-            f.write(headers[item] + " : " + str(defaults[item]) + "\n")
+    if volume > 0:
+        with open(config_file, 'w') as f:
+            for item in range(0,len(headers)):
+                f.write(headers[item] + " : " + str(defaults[item]) + "\n")
 
 def Set_Volume():
     global mixername,m,msg,MP3_Play,radio,radio_stn,shuffled,album_mode,volume,gapless,buttonVOLUP,lver
@@ -348,7 +351,7 @@ def Set_Volume():
     while buttonVOLUP.is_pressed:
         if time.monotonic() - timer1 > 0.5:
             volume -= 2
-            volume = max(volume,0)
+            volume = max(volume,2)
             msg[0] = "Volume " + str(volume)
             display_screen()
             if len(alsaaudio.mixers()) > 0 and lver < 13:
@@ -379,7 +382,10 @@ def status():
     global txt,shuffled,gapless,album_mode,sleep_time
     txt = " "
     if shuffled == 1:
-        txt +="R"
+        if album_mode == 0:
+            txt +="R"
+        else:
+            txt +="r"
     else:
         txt +=" "
     if gapless == 1:
@@ -394,6 +400,10 @@ def status():
         txt +="S"
     else:
         txt +=" "
+    if volume > 0:
+        txt +=" "
+    else:
+        txt +=" MUTED"
 
 # read previous usb free space of upto 4 usb devices, to see if usb data has changed
 if not os.path.exists('freedisk.txt'):
@@ -447,6 +457,8 @@ msg[0] = "Tracks: " + str(len(tracks))
 if Track_No > len(tracks) - 1:
     Track_No = 0
 display_screen()
+if len(tracks) == 0:
+	MP3_Play = 0
 
 # check if USB mounted and find USB storage
 if use_USB == 1:
@@ -546,7 +558,6 @@ def album_length():
     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
     new_artist = titles[0]
     new_album  = titles[1]
-    tracks.sort()
     Track_No -= 100
     Track_No = max(Track_No,0)
     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
@@ -823,6 +834,9 @@ while True:
                 pass
             if time.monotonic() - timer1 < 1:
 				# PREVIOUS ALBUM
+                if album_mode == 1 and shuffled == 1:
+                    shuffled = 0
+                    tracks.sort()
                 while titles[1] == old_album and titles[0] == old_artist and Track_No > -1:
                     Track_No -=1
                     if Track_No < 0:
@@ -856,6 +870,9 @@ while True:
                 time.sleep(0.5)
             if time.monotonic() - timer1 > 1:
                 # NEXT ALBUM
+                if album_mode == 1 and shuffled == 1:
+                    shuffled = 0
+                    tracks.sort()
                 while buttonNEXT.is_pressed and buttonSLEEP.is_pressed == 0 and buttonVOLUP.is_pressed == 0:
                     while titles[1] == old_album and titles[0] == old_artist:
                         Track_No +=1
@@ -1005,6 +1022,8 @@ while True:
                 else:
 					# switch ALBUM MODE OFF
                     album_mode = 0
+                    shuffled   = 0
+                    tracks.sort()
                     msg = [""] * 8
                     msg[1] = "Album Mode OFF "
                 save_config()
@@ -1013,27 +1032,37 @@ while True:
                 display_screen()
                 time.sleep(1)
             else:  
+                # RANDOMISE
                 msg = [""] * 8
                 msg[0] = "PLAY/Radio  PRE/NXT" 
                 if shuffled == 0:
-					# shuffle tracks 
-                    shuffled   = 1
-                    album_mode = 0
-                    shuffle(tracks)
-                    Track_No = 0
-                    msg[1] = "Random Mode ON "
+                    if album_mode == 0:
+				        # shuffle tracks
+                        shuffled = 1
+                        shuffle(tracks)
+                        Track_No = 0
+                        msg[1] = "Random Mode ON "
+                    else:
+					    # SHUFFLE ALBUM
+                        tracks[Track_No + 1:Track_No + atracks] = random.sample(tracks[Track_No + 1:Track_No + atracks],((Track_No + atracks) - (Track_No + 1)))
+                        shuffled = 1
+                        msg[1] = "Random Album ON "
+                        album_length()
                 else:
-					# unshuffle tracks 
+				    # unshuffle tracks 
                     shuffled = 0
                     msg[1] = "Random Mode OFF "
-                    itles[0],itles[1],itles[2],itles[3],itles[4],itles[5],itles[6] = tracks[Track_No].split("/")
-                    tracks.sort()
-                    Track_No = 0
-                    titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    while titles[0] != itles[0] or titles[1] != itles[1]:
-                        Track_No +=1
+                    if album_mode == 0:
+                        itles[0],itles[1],itles[2],itles[3],itles[4],itles[5],itles[6] = tracks[Track_No].split("/")
+                        tracks.sort()
+                        Track_No = 0
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                    if album_mode == 1:
+                        while titles[0] != itles[0] or titles[1] != itles[1]:
+                            Track_No +=1
+                            titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
+                    else:
+				     	# UNSHUFFLE ALBUM
+                        tracks.sort()
                         album_length()
                 display_screen()
                 save_config()
@@ -1141,7 +1170,7 @@ while True:
             if show_clock == 1 and synced == 1:
                 msg[6] = "          " + clock
             msg[0] = "STOP         PRE/NEXT"
-            msg[7] = "VOL+/-     RND/SLEEP"
+            msg[7] = "VOL+/-   MUTE/SLEEP"
             display_screen()
             
         # display clock whilst timed out (if enabled and synced)
@@ -1170,7 +1199,7 @@ while True:
             status()
             msg = [""] * 8
             msg[0] = "STOP         PRE/NXT"
-            msg[7] = "VOL+/-     RND/SLEEP"
+            msg[7] = "VOL+/-   MUTE/SLEEP"
             time.sleep(0.5)
             display_screen()
         elif buttonVOLUP.is_pressed:
@@ -1181,7 +1210,7 @@ while True:
             time.sleep(0.5)
             msg = [""] * 8
             msg[0] = "STOP         PRE/NXT"
-            msg[7] = "VOL+/-     RND/SLEEP"
+            msg[7] = "VOL+/-   MUTE/SLEEP"
             display_screen()
             Disp_timer = time.monotonic()
           
@@ -1192,7 +1221,7 @@ while True:
             status()
             msg = [""] * 8
             msg[0] = "STOP        PRE/NEXT"
-            msg[7] = "VOL+/-     RND/SLEEP"
+            msg[7] = "VOL+/-   MUTE/SLEEP"
             display_screen()
             time.sleep(0.5)
         elif buttonNEXT.is_pressed:
@@ -1247,7 +1276,7 @@ while True:
             status()
             msg = [""] * 8
             msg[0] = "STOP        PRE/NEXT"
-            msg[7] = "VOL+/-     RND/SLEEP"
+            msg[7] = "VOL+/-   MUTE/SLEEP"
             display_screen()
             time.sleep(0.5)
         elif buttonPLAY.is_pressed:
@@ -1289,7 +1318,7 @@ while True:
                 if time.monotonic() - timer1 > 1:
         			# set SLEEP TIME
                     Disp_timer = time.monotonic()
-                    if (sleep_time == 0 and album_mode == 0) or (album_mode ==1 and sleep_time == alength + 60):
+                    if sleep_time == 0:
                         sleep_time = 900
                     else:
                         sleep_time = (time_left * 60) + 960
@@ -1305,13 +1334,22 @@ while True:
                     display_screen()
                     time.sleep(1)
             if time.monotonic() - timer1 <= 1:
-                rp = random.randint(0,int(len(Radio_Stns)/3))
-                radio_stn = rp * 3
-                q.kill()
-                q = subprocess.Popen(["cvlc",Radio_Stns[radio_stn + 1]] ,shell=False)
-                msg[1] = (Radio_Stns[radio_stn])
-                display_screen()
-                time.sleep(1)
+				# MUTE
+                if volume > 0:
+                    old_volume = volume
+                    volume = 0 # MUTED
+                    msg[4] = "           MUTED"
+                else:
+                    volume = old_volume
+                    msg[4] = ""
+                if len(alsaaudio.mixers()) > 0 and lver < 13:
+                    m.setvolume(volume)
+                    os.system("amixer -D pulse sset Master " + str(volume) + "%")
+                    if mixername == "DSP Program":
+                        os.system("amixer set 'Digital' " + str(volume + 107))
+                else:
+                    os.system("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + str(volume/100))
+                time.sleep(.25)
                     
     # loop while playing MP3 tracks
     while MP3_Play == 1 :
@@ -1337,7 +1375,7 @@ while True:
                 pass
                 
         # stop playing if end of album, in album mode
-        if album_mode == 1:
+        if album_mode == 1 and len(tracks) > 0:
             if Track_No > (astrack + atracks) - 1:
                 status()
                 msg[0] = "PLAY/Radio  PRE/NXT"
@@ -1422,7 +1460,7 @@ while True:
           msg[2] = titles[1][0:19]
           temt   = titles[2][0:-4]
           msg[3] = temt[0:19]
-          msg[7] = "VOL+/-     RND/SLEEP"
+          msg[7] = "VOL+/-   MUTE/SLEEP"
           if Disp_on == 1:
               ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
               pfiles = glob.glob(ptrack + "*.jpg")
@@ -1479,9 +1517,9 @@ while True:
                 msg[3] = temt[0:19]
                 msg[0] = "STOP/Radio  PRE/NXT"
                 status()
-                msg[5] = "Status...  " +  txt
+                msg[5] = "Status.. " +  txt
                 msg[6] = ""
-                msg[7] = "VOL+/-     RND/SLEEP"
+                msg[7] = "VOL+/-   MUTE/SLEEP"
                 if sleep_time != 0:
                     time_left = int((sleep_time - (time.monotonic() - sleep_timer))/60)
                     if sleep_shutdn == 1:
@@ -1684,42 +1722,20 @@ while True:
                         display_screen()
                         time.sleep(1)
                 if time.monotonic() - timer1 <= 1:
-						# RANDOMISE
-                        msg = [""] * 8
-                        msg[0] = "PLAY/Radio  PRE/NXT" 
-                        if shuffled == 0:
-                            if album_mode == 0:
-								# shuffle tracks
-                                shuffled = 1
-                                shuffle(tracks)
-                                Track_No = 0
-                                msg[1] = "Random Mode ON "
-                            else:
-								# SHUFFLE ALBUM
-                                tracks[Track_No + 1:Track_No + atracks] = random.sample(tracks[Track_No + 1:Track_No + atracks],((Track_No + atracks) - (Track_No + 1)))
-                                shuffled = 1
-                                msg[1] = "Random Album ON "
-                                album_length()
-                        else:
-					        # unshuffle tracks 
-                            shuffled = 0
-                            msg[1] = "Random Mode OFF "
-                            if album_mode == 0:
-                                itles[0],itles[1],itles[2],itles[3],itles[4],itles[5],itles[6] = tracks[Track_No].split("/")
-                                tracks.sort()
-                                Track_No = 0
-                                titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                                while titles[0] != itles[0] or titles[1] != itles[1]:
-                                    Track_No +=1
-                                    titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
-                            else:
-								# UNSHUFFLE ALBUM
-                                tracks[Track_No + 1:Track_No + atracks]=sorted(tracks[Track_No + 1:Track_No + atracks])
-                                album_length()
-                        display_screen()
-                        save_config()
-                        time.sleep(1)
-                        
+					# MUTE
+                    if volume > 0:
+                        old_volume = volume
+                        volume = 0 # MUTED
+                    else:
+                        volume = old_volume
+                    if len(alsaaudio.mixers()) > 0 and lver < 13:
+                        m.setvolume(volume)
+                        os.system("amixer -D pulse sset Master " + str(volume) + "%")
+                        if mixername == "DSP Program":
+                            os.system("amixer set 'Digital' " + str(volume + 107))
+                    else:
+                        os.system("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + str(volume/100))
+                    time.sleep(1)
                 
             poll = p.poll()
           if go == 1:
