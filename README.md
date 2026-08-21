@@ -5,10 +5,11 @@
 Features:
     * Play MP3s or Internet Radio
     * Album mode
-    * Random mode
+    * Random mode (All or Album)
     * Gapless mode
     * Adjust Volume
     * Sleep timer
+    * Mute
     * show album cover picture
     * show radio station logo picture
 
