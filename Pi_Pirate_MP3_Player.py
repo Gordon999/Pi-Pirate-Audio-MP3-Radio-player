@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.37"
+version  = "1.38"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -671,7 +671,7 @@ while True:
         # Display Artist / Album / Track names
         if Disp_on == 1:
             msg = [""] * 8
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             if len(tracks) > 0:
                 msg[1] = titles[0][0:19] # Artist
                 if len(titles[1]) < 21:
@@ -766,7 +766,7 @@ while True:
             else:
 				# aborted stop / shutdown
                 status()
-                msg[0] = "PLAY/Radio  PRE/NXT"
+                msg[0] = "PLAY/Radio PRE/NEXT"
                 display_screen()
             Disp_timer = time.monotonic()
             
@@ -776,16 +776,17 @@ while True:
             Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             display_screen()
             time.sleep(0.5)
         elif buttonPLAY.is_pressed:
+			# START MP3 or RADIO PLAY
             stopped = 0
             Disp_on = 1
             Disp_timer = time.monotonic()
             timer1 = time.monotonic()
             msg = [""] * 8
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             msg[1] = "HOLD 3s for RADIO"
             display_screen()
             time.sleep(0.5)
@@ -824,7 +825,7 @@ while True:
             Disp_on = 1
             Disp_timer = time.monotonic()
             status()
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             display_screen()
             time.sleep(0.5)
         elif buttonNEXT.is_pressed and len(tracks) > 1:
@@ -860,7 +861,7 @@ while True:
                 pfiles = []
                 ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
                 pfiles = glob.glob(ptrack + "*.jpg")
-                msg[0] = "PLAY/Radio  PRE/NXT" 
+                msg[0] = "PLAY/Radio PRE/NEXT" 
                 time.sleep(0.05)
                 msg[1] = titles[0][0:19]
                 msg[2] = titles[1][0:19]
@@ -885,7 +886,7 @@ while True:
                     old_artist = titles[0]
                     if album_mode == 1:
                         album_length()
-                    msg[0] = "PLAY/Radio  PRE/NXT" 
+                    msg[0] = "PLAY/Radio PRE/NEXT" 
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
                     temt   = titles[2][0:-4]
@@ -948,7 +949,7 @@ while True:
             Disp_on = 1
             Disp_timer = time.monotonic()
             status()
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             display_screen()
             time.sleep(0.5)
         elif buttonSLEEP.is_pressed:
@@ -972,7 +973,7 @@ while True:
                 display_screen()
                 time.sleep(1)
             status()
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             display_screen()
             save_config()
             time.sleep(0.5)
@@ -1001,7 +1002,7 @@ while True:
             Disp_on = 1
             Disp_timer = time.monotonic()
             status()
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             display_screen()
             time.sleep(0.5)
         elif buttonVOLUP.is_pressed:
@@ -1022,7 +1023,7 @@ while True:
                         Track_No +=1
                         titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     msg    = [""] * 8
-                    msg[0] = "PLAY/Radio  PRE/NXT"
+                    msg[0] = "PLAY/Radio PRE/NEXT"
                     msg[1] = "Album Mode ON "
                     album_length()
                 else:
@@ -1040,7 +1041,7 @@ while True:
             else:  
                 # RANDOMISE
                 msg = [""] * 8
-                msg[0] = "PLAY/Radio  PRE/NXT" 
+                msg[0] = "PLAY/Radio PRE/NEXT" 
                 if shuffled == 0:
                     if album_mode == 0:
 				        # shuffle tracks
@@ -1083,7 +1084,7 @@ while True:
                 save_config()
 
             status()
-            msg[0] = "PLAY/Radio  PRE/NXT"
+            msg[0] = "PLAY/Radio PRE/NEXT"
             ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
             pfiles = glob.glob(ptrack + "*.jpg")
             display_screen()
@@ -1115,7 +1116,7 @@ while True:
         if album_mode == 1 and len(tracks) > 0:
             if Track_No > (astrack + atracks) - 1:
                 status()
-                msg[0] = "PLAY/Radio  PRE/NXT"
+                msg[0] = "PLAY/Radio PRE/NEXT"
                 msg[1] = titles[0][0:19]
                 msg[2] = titles[1][0:19]
                 temt   = titles[2][0:-4]
@@ -1188,14 +1189,14 @@ while True:
         if MP3_Play == 1 and len(tracks) > 0:
           titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
           track = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/" + titles[2]
-          msg[0] = "STOP/Radio  PRE/NXT"
           rpistr = "mplayer" + " -quiet " +  '"' + track + '"'
-          msg[1] = titles[0][0:19]
-          msg[2] = titles[1][0:19]
-          temt   = titles[2][0:-4]
-          msg[3] = temt[0:19]
-          msg[7] = "VOL+/-   MUTE/SLEEP"
           if Disp_on == 1:
+              msg[0] = "STOP         PRE/NEXT"
+              msg[1] = titles[0][0:19]
+              msg[2] = titles[1][0:19]
+              temt   = titles[2][0:-4]
+              msg[3] = temt[0:19]
+              msg[7] = "VOL+/-   MUTE/SLEEP"
               ptrack = titles[3] + "/" + titles[4] + "/" + titles[5] + "/" + titles[6] + "/" + titles[0] + "/" + titles[1] + "/"
               pfiles = glob.glob(ptrack + "*.jpg")
               display_screen()
@@ -1249,7 +1250,7 @@ while True:
                 msg[2] = titles[1][0:19]
                 temt   = titles[2][0:-4]
                 msg[3] = temt[0:19]
-                msg[0] = "STOP/Radio  PRE/NXT"
+                msg[0] = "STOP         PRE/NEXT"
                 status()
                 msg[5] = "Status.. " +  txt
                 msg[6] = ""
@@ -1300,10 +1301,7 @@ while True:
                 Disp_on = 1
                 Disp_timer = time.monotonic()
                 status()
-                msg[0] = "STOP/Radio  PRE/NXT"
-                display_screen()
                 time.sleep(0.5)
-
             elif buttonPLAY.is_pressed:
 				# STOP Play
                 Disp_on = 1
@@ -1315,7 +1313,7 @@ while True:
                 time.sleep(2)
                 status()
                 msg = [""] * 8
-                msg[0] = "PLAY/Radio  PRE/NXT"
+                msg[0] = "PLAY/Radio PRE/NEXT"
                 display_screen()
                 go = 0
                 MP3_Play = 0
@@ -1326,8 +1324,6 @@ while True:
                 Disp_on = 1
                 Disp_timer = time.monotonic()
                 status()
-                msg[0] = "STOP/Radio  PRE/NXT"
-                display_screen()
                 time.sleep(0.5)
             elif buttonNEXT.is_pressed:
                 Disp_on = 1
@@ -1359,7 +1355,7 @@ while True:
                                 msg[4] = ""
                             if Track_No > len(tracks) - 1:
                                 Track_No = Track_No - len(tracks)
-                            msg[0] = "STOP/Radio  PRE/NXT"
+                            msg[0] = "STOP         PRE/NEXT"
                             titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                             msg[1] = titles[0][0:19]
                             msg[2] = titles[1][0:19]
@@ -1391,7 +1387,7 @@ while True:
                             msg[4] = ""
                         if Track_No < 0:
                             Track_No = len(tracks) + Track_No
-                    msg[0] = "STOP/Radio  PRE/NXT"
+                    msg[0] = "STOP         PRE/NEXT"
                     titles[0],titles[1],titles[2],titles[3],titles[4],titles[5],titles[6] = tracks[Track_No].split("/")
                     msg[1] = titles[0][0:19]
                     msg[2] = titles[1][0:19]
@@ -1407,14 +1403,13 @@ while True:
                 Disp_on = 1
                 Disp_timer = time.monotonic()
                 status()
-                msg[0] = "STOP/Radio  PRE/NXT"
-                display_screen()
                 time.sleep(0.5)
             elif buttonVOLUP.is_pressed:
+				# set Volume
                 time.sleep(0.5)
                 Set_Volume()
                 status()
-                msg[0] = "STOP/Radio  PRE/NXT" 
+                msg[0] = "STOP         PRE/NEXT" 
                 display_screen()
                 Disp_timer = time.monotonic()
                          
@@ -1423,8 +1418,6 @@ while True:
                 Disp_timer = time.monotonic()
                 Disp_on = 1
                 status()
-                msg[0] = "STOP/Radio  PRE/NXT"
-                display_screen()
                 time.sleep(1)
             elif buttonSLEEP.is_pressed:
                 timer1 = time.monotonic()
@@ -1472,6 +1465,7 @@ while True:
                 
             poll = p.poll()
           if go == 1:
+			  # play next track
               Track_No +=1
           if Track_No < 0:
               Track_No = len(tracks) + Track_No
@@ -1574,6 +1568,10 @@ while True:
                     msg[2] = "Stopping: " + str(time_left) + "mins"
             if show_clock == 1 and synced == 1:
                 msg[6] = "          " + clock
+            if volume == 0:
+                msg[4] = "           MUTED"
+            else:
+                msg[4] = ""
             msg[0] = "STOP         PRE/NEXT"
             msg[7] = "VOL+/-   MUTE/SLEEP"
             display_screen()
@@ -1603,11 +1601,10 @@ while True:
             Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
-            msg[0] = "STOP         PRE/NXT"
-            msg[7] = "VOL+/-   MUTE/SLEEP"
-            time.sleep(0.5)
             display_screen()
+            time.sleep(0.5)
         elif buttonVOLUP.is_pressed:
+			# set Volume
             Disp_on = 1
             Disp_timer = time.monotonic()
             Set_Volume()
@@ -1625,8 +1622,6 @@ while True:
             Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
-            msg[0] = "STOP        PRE/NEXT"
-            msg[7] = "VOL+/-   MUTE/SLEEP"
             display_screen()
             time.sleep(0.5)
         elif buttonNEXT.is_pressed:
@@ -1699,19 +1694,16 @@ while True:
             Disp_on = 1
             Disp_timer = time.monotonic()
             status()
-            msg = [""] * 8
-            msg[0] = "STOP        PRE/NEXT"
-            msg[7] = "VOL+/-   MUTE/SLEEP"
-            display_screen()
             time.sleep(0.5)
         elif buttonPLAY.is_pressed:
+			# STOP Radio
             Disp_on = 1
             Disp_timer = time.monotonic()
             q.kill()
             radio = 0
             msg = [""] * 8
             if len(tracks) > 0:
-                msg[0] = "PLAY/Radio  PRE/NXT"
+                msg[0] = "PLAY/Radio PRE/NEXT"
                 msg[1] = titles[0][0:19]
                 msg[2] = titles[1][0:19]
                 temt   = titles[2][0:-4]
@@ -1730,7 +1722,6 @@ while True:
             Disp_timer = time.monotonic()
             status()
             msg = [""] * 8
-            msg[0] = "STOP       PRE/NEXT"
             display_screen()
             time.sleep(0.5)
         elif buttonSLEEP.is_pressed:
@@ -1763,10 +1754,8 @@ while True:
                 if volume > 0:
                     old_volume = volume
                     volume = 0 # MUTED
-                    msg[4] = "           MUTED"
                 else:
                     volume = old_volume
-                    msg[4] = ""
                 if len(alsaaudio.mixers()) > 0 and lver < 13:
                     m.setvolume(volume)
                     os.system("amixer -D pulse sset Master " + str(volume) + "%")
