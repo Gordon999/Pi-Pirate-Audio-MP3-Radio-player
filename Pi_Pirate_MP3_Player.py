@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.38"
+version  = "1.39"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -1206,9 +1206,9 @@ while True:
           poll = p.poll()
           while poll != None:
             poll = p.poll()
-          timer1 = time.monotonic()
+          timer2 = time.monotonic()
           go = 1
-          played = time.monotonic() - timer1
+          played = time.monotonic() - timer2
           
           # loop while playing selected MP3 track
           while poll == None and track_len - played > gap and (time.monotonic() - sleep_timer < sleep_time or sleep_time == 0):
@@ -1234,7 +1234,8 @@ while True:
                   old_secs2 = secs
                 
             time.sleep(0.2)
-            played  = time.monotonic() - timer1
+            # calculate played time
+            played  = time.monotonic() - timer2
 
             # DISPLAY OFF timer
             if time.monotonic() - Disp_timer > Disp_time and Disp_time > 0 and Disp_on == 1:
