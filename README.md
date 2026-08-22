@@ -2,6 +2,8 @@
 
 ![Image](image.jpg)
 
+Example using Pirate 3W Amp HAT and Pi Zero2W
+
 Features:
     * Play MP3s or Internet Radio
     * Album mode
