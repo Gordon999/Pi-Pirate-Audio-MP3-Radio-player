@@ -15,11 +15,11 @@ Features:
 
 TESTED with RaspiOS 32bit BOOKWORM, and TRIXIE 64bit
 
-On the USB sticks the format must be/media/USERNAME/USBNAME/Artist Name/Album Name/Track Names
+On the USB sticks the format must be /media/USERNAME/USBNAME/Artist Name/Album Name/Track Names
 
 on the sd card under /home/USERNAME/Music/Artist Name/Album Name/Track Names
 
-Put Album Cover images in Album Name directory, use .jpgs and ideally 240 x 240.
+Put Album Cover images in Album Name directory, use .jpgs and ideally 240 x 240. (They will be resized if not)
 
 If you can't see the text on the image you can add a file called colors.txt in the Album Name directory containing r,g,b values eg. 0,0,0 for black.
 If you put one line in the file ALL lines will be the same colour, putting 8 lines of data will set each line individually.
