@@ -32,7 +32,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-version  = "1.36"
+version  = "1.37"
 
 # set default variables (saved in config_file and overridden at future startups)
 MP3_Play     = 0   # set to 1 to start playing MP3s at boot, else 0
@@ -56,7 +56,7 @@ gaptime      = 2   # set pre-start time for gapless, in seconds
 screen       = 0   # for testing, 0 = ST7789, 1 = pygame screen
 banners      = 0   # set to 1 to add black backgrounds on rows 1 and 8
 
-#RADIO STATIONS, "Name","URL","0 or 1" - 1 means don't show name if you have a logo image.
+#RADIO STATIONS, "Name","URL",0 or 1 - 1 means don't show name if you have a logo image.
 Radio_Stns = ["Radio Paradise Rock","http://stream.radioparadise.com/rock-192",1,
               "Radio Paradise Main","http://stream.radioparadise.com/mp3-320",0,
               "Radio Paradise Mellow","http://stream.radioparadise.com/mellow-192",0,
@@ -190,6 +190,7 @@ astrack     = 0
 aitracks    = [0] * 70
 scroll      = 0
 old_volume  = volume
+old_radio   = ""
 
 # find username
 h_user  = []
@@ -1049,7 +1050,7 @@ while True:
                         msg[1] = "Random Mode ON "
                     else:
 					    # SHUFFLE ALBUM
-                        tracks[Track_No + 1:Track_No + atracks] = random.sample(tracks[Track_No + 1:Track_No + atracks],((Track_No + atracks) - (Track_No + 1)))
+                        tracks[Track_No:Track_No + atracks] = random.sample(tracks[Track_No:Track_No + atracks],atracks)
                         shuffled = 1
                         msg[1] = "Random Album ON "
                         album_length()
@@ -1634,8 +1635,8 @@ while True:
             timer1 = time.monotonic()
             while buttonNEXT.is_pressed and time.monotonic() - timer1 < 1:
                 pass
-            while buttonNEXT.is_pressed:
-                if time.monotonic() - timer1 > 1:
+            if time.monotonic() - timer1 > 1:
+                while buttonNEXT.is_pressed and buttonSLEEP.is_pressed == 0 and buttonVOLUP.is_pressed == 0:
 					# Next Radio Station
                     radio_stn +=3
                     if radio_stn > len(Radio_Stns) - 3:
@@ -1644,6 +1645,26 @@ while True:
                         radio_stn +=3
                     if radio_stn > len(Radio_Stns) - 3:
                         radio_stn = 0
+                    msg[1] = (Radio_Stns[radio_stn])
+                    now = datetime.datetime.now()
+                    clock = now.strftime("%H:%M:%S")
+                    secs = now.strftime("%S")
+                    if show_clock == 1 and synced == 1:
+                        msg[6] = "        " + clock
+                    msg[7] = "Radio A-Z "
+                    display_screen()
+                    time.sleep(0.5)
+                while buttonNEXT.is_pressed and buttonVOLUP.is_pressed:
+					# Next Radio Station A-Z
+                    old_radio = Radio_Stns[radio_stn][0:1]
+                    while Radio_Stns[radio_stn][0:1] == old_radio[0:1]:
+                        radio_stn +=3
+                        if radio_stn > len(Radio_Stns) - 3:
+                            radio_stn = 0
+                        if Radio_Stns[radio_stn][0:1] == "#":
+                            radio_stn +=3
+                        if radio_stn > len(Radio_Stns) - 3:
+                            radio_stn = 0
                     msg[1] = (Radio_Stns[radio_stn])
                     now = datetime.datetime.now()
                     clock = now.strftime("%H:%M:%S")
