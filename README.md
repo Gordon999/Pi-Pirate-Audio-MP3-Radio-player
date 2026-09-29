@@ -1,6 +1,6 @@
 # Pi-Pirate-Audio-MP3-Radio-player
 
-![Image](image.jpg)
+![Image](screenshot.jpg)
 
 Example using Pirate 3W Amp HAT and Pi Zero2W
 
