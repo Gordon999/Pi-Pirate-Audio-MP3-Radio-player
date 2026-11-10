@@ -61,7 +61,7 @@ dtoverlay=hifiberry-dac
  
 gpio=25=op,dh
 
-if using the latest RaspiOS TRixie also add
+if using the latest RaspiOS Trixie also add
 
 dtoverlay=spi0-2cs,no_miso
 
