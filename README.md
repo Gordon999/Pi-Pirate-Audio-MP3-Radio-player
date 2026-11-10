@@ -61,6 +61,10 @@ dtoverlay=hifiberry-dac
  
 gpio=25=op,dh
 
+if using the latest RaspiOS TRixie also add
+
+dtoverlay=spi0-2cs,no_miso
+
 # To run at boot if using labwc
 
 Add /usr/bin/python ~/Pi_Pirate_MP3_Player.py to ~/.config/labwc/autostart
